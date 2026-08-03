@@ -61,14 +61,27 @@ export interface InitializeRequest extends RequestEnvelope {
   };
 }
 
-export interface CreateOrUpdateBenefitRequest extends RequestEnvelope {
-  readonly operation: 'createBenefit' | 'updateBenefit';
-  readonly payload: { readonly span: DimensionMap; readonly formula: unknown };
+interface BenefitPayload { readonly span: DimensionMap; readonly formula: unknown }
+interface SpanPayload { readonly span: DimensionMap }
+
+export interface CreateBenefitRequest extends RequestEnvelope {
+  readonly operation: 'createBenefit';
+  readonly payload: BenefitPayload;
 }
 
-export interface SpanRequest extends RequestEnvelope {
-  readonly operation: 'deleteBenefit' | 'queryBenefit';
-  readonly payload: { readonly span: DimensionMap };
+export interface UpdateBenefitRequest extends RequestEnvelope {
+  readonly operation: 'updateBenefit';
+  readonly payload: BenefitPayload;
+}
+
+export interface DeleteBenefitRequest extends RequestEnvelope {
+  readonly operation: 'deleteBenefit';
+  readonly payload: SpanPayload;
+}
+
+export interface QueryBenefitRequest extends RequestEnvelope {
+  readonly operation: 'queryBenefit';
+  readonly payload: SpanPayload;
 }
 
 export interface QueryEmployeeRequest extends RequestEnvelope {
@@ -78,14 +91,23 @@ export interface QueryEmployeeRequest extends RequestEnvelope {
 
 /**
  * A structurally valid request, narrowed by `operation` so that a caller
- * switching on `operation` gets the corresponding payload shape without a
- * second cast. The schema already encodes this correspondence (IC's `allOf`
- * conditionals); this type makes it visible to the type checker.
+ * switching on `operation` -- or using `Extract<ParsedRequest, {operation:
+ * '...'}>` for a single-operation handler signature -- gets the
+ * corresponding payload shape without a second cast. Each operation has its
+ * own interface with a single-literal `operation` field so `Extract`
+ * resolves cleanly; grouping create/update or delete/query under one
+ * interface with a union `operation` field (the first version of this type)
+ * defeats `Extract`, since it matches structurally rather than by
+ * discriminant. The schema already encodes the operation-to-payload
+ * correspondence (IC's `allOf` conditionals); this type makes it visible to
+ * the type checker.
  */
 export type ParsedRequest =
   | InitializeRequest
-  | CreateOrUpdateBenefitRequest
-  | SpanRequest
+  | CreateBenefitRequest
+  | UpdateBenefitRequest
+  | DeleteBenefitRequest
+  | QueryBenefitRequest
   | QueryEmployeeRequest;
 
 export class MalformedRequestError extends Error {

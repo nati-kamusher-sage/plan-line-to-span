@@ -72,7 +72,7 @@ T3  span + store             + 0  cumulative  0/48   [merged #6]
 T4  matching                 +11  cumulative 11/48   [merged #7]
 T5  global + zero-dim        + 5  cumulative 16/48   [merged #8]
 T6  parser + envelope        + 2  cumulative 18/48   [merged #9]
-T7  dispatcher/lifecycle     + 9  cumulative 27/48
+T7  dispatcher/lifecycle     + 9  cumulative 27/48   [merged #10]
 T8  validation pipeline      + 5  cumulative 32/48
 T9  benefit operations       +11  cumulative 43/48
 T10 observability            + 4  cumulative 47/48
@@ -171,6 +171,8 @@ The all-axis-covering box and the zero-axis model (DEC-14 to DEC-16).
 
 ### T7 — dispatcher and lifecycle
 
+**Status: Complete.** Merged as [#10](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/10); see [t7-dispatcher-lifecycle.md](pull-requests/t7-dispatcher-lifecycle.md).
+
 `OperationDispatcher` and `LifecycleState` (DEC-29, DEC-30, DEC-34 to DEC-39).
 
 - Intake gate as one expression from IC 6.1.
@@ -181,6 +183,8 @@ The all-axis-covering box and the zero-axis model (DEC-14 to DEC-16).
 **Resolves open items:** `priorState` storage; non-200 status decision (ISSUE-D2).
 **Cases:** `AC-INIT-01` to `AC-INIT-08`, `AC-SERIAL-01`.
 **Tests:** promote `dt-5-lifecycle.mjs`; add the `handlers-never-await` static check (DEC-64).
+
+**Outcome:** 150 tests pass. ISSUE-D2 resolved for the demo by not modelling an HTTP status at this layer at all — `error.code` remains the sole authority per DT-1 DEC-4. `AC-INIT-06` (an operation submitted while initializing) is satisfied by a narrow test-only accessor exposing `LifecycleState` directly, matching DT-9's anticipation that no new seam was needed, since DEC-39's synchronous handlers mean genuine concurrent interleaving cannot arise to test against. **Two defects surfaced and were fixed:** T6's `ParsedRequest` union grouped two operations under one interface with a union-valued discriminant, which defeated `Extract`-based type narrowing; split into one interface per operation. Separately, `if (a.op === 'x' || a.op === 'y') { a.payload }` does not narrow a discriminated union in TypeScript the way a single equality check does — confirmed with an isolated reproduction before accepting it as real behavior rather than a misconfiguration.
 
 ### T8 — validation pipeline
 
