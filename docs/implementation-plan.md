@@ -219,9 +219,13 @@ Create, update, delete, and exact query end to end.
 
 ### T11 — index fault injection
 
+**Status: Complete.** Merged as [#13](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/13); see [t11-index-fault-injection.md](pull-requests/t11-index-fault-injection.md).
+
 The `inject-index-failure` seam at `IndexAdapter` (DEC-62, DEC-63).
 
 **Cases:** `AC-INIT-09` — closing the gap the readiness review recorded as unverifiable.
+
+**Outcome:** 189 tests pass. `IndexAdapter`'s private fields make it nominal for TypeScript's structural-typing purposes, so a fault-injecting test double could not simply implement its public shape; an `IndexPort` interface was extracted (the surface `BenefitStore` actually calls), and `OperationDispatcher` gained a constructor-level index-port factory defaulting to the real wiring. `FaultInjectingIndexPort` needed a `failAfter` count, not just a nominated operation, since the case requires a prior benefit to exist before a *later* call to the same operation fails — a first test draft that fails on every call to the nominated operation cannot express that and was discarded rather than patched. As a side effect, confirmed `INDEX_FAILURE` now produces a real `error`-level log record through the full emitter+dispatcher+fault-injection path, closing a gap T10 had only checked at the unit level.
 
 ### T12 — performance harness
 

@@ -5,8 +5,8 @@
  * geometry out of the domain core: `BenefitStore` calls `insert`, `remove`,
  * and `search` without knowing an R*-tree is underneath, which is what lets
  * DT-2a's index choice change without disturbing the component structure,
- * and is the seam T9's `inject-index-failure` capability uses without
- * `RTreeIndex` itself being aware of testing.
+ * and is the seam T11's `inject-index-failure` capability uses without
+ * `RTree` itself being aware of testing.
  */
 
 import type { RTree } from '../index/rtree.ts';
@@ -32,7 +32,27 @@ export class IndexFailureError extends Error {
   }
 }
 
-export class IndexAdapter {
+/**
+ * The port `BenefitStore` actually depends on (DEC-31, DEC-62).
+ *
+ * `IndexAdapter`'s private fields make the class itself nominal: TypeScript
+ * requires an exact subclass, not merely a structurally identical class, to
+ * satisfy a type with private members. Extracting this interface is what
+ * lets T11's `FaultInjectingIndexPort` (a plain class with no relation to
+ * `IndexAdapter`) substitute at this port without `BenefitStore` or
+ * `IndexAdapter` needing to know testing exists (DT-9 section 3.1: "the
+ * fault is injected at the port rather than inside the algorithm").
+ */
+export interface IndexPort {
+  readonly size: number;
+  insert(span: CanonicalSpan, formula: unknown): void;
+  remove(span: CanonicalSpan): boolean;
+  findExact(span: CanonicalSpan): IndexedBenefit | undefined;
+  searchMatching(planLine: Readonly<Record<string, string>>): IndexedBenefit[];
+  all(): IndexedBenefit[];
+}
+
+export class IndexAdapter implements IndexPort {
   private readonly tree: RTree<IndexedBenefit>;
   private readonly model: DimensionModel;
 

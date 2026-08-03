@@ -26,14 +26,33 @@ import {
 } from '../model/dimension-model.ts';
 import { resolveSpan, UnknownDimensionError, UnknownDimensionValueError } from '../model/span.ts';
 import { RTree } from '../index/rtree.ts';
-import { IndexAdapter, IndexFailureError, type IndexedBenefit } from '../store/index-adapter.ts';
+import { IndexAdapter, IndexFailureError, type IndexedBenefit, type IndexPort } from '../store/index-adapter.ts';
 import { BenefitStore, DuplicateSpanError, BenefitNotFoundError } from '../store/benefit-store.ts';
 import { success, failure, type Response } from './response.ts';
 
+/** Builds the index port a freshly (re)initialized model is backed by. */
+export type IndexPortFactory = (model: DimensionModel) => IndexPort;
+
+const defaultIndexPortFactory: IndexPortFactory = model =>
+  new IndexAdapter(new RTree<IndexedBenefit>(model.axisCount), model);
+
 export class OperationDispatcher {
   private readonly lifecycle = new LifecycleState();
+  private readonly buildIndexPort: IndexPortFactory;
   private model: DimensionModel | undefined;
   private store: BenefitStore | undefined;
+
+  /**
+   * `buildIndexPort` defaults to the real `RTree`/`IndexAdapter` stack, so
+   * every existing caller is unaffected. T11's `inject-index-failure`
+   * capability is the one caller that passes a substitute -- an ordinary
+   * dependency-injection seam, not a test-aware branch in production logic
+   * (DT-9 section 3.1: the fault belongs at the port, not inside the
+   * algorithm, and this constructor is where the port is chosen).
+   */
+  constructor(buildIndexPort: IndexPortFactory = defaultIndexPortFactory) {
+    this.buildIndexPort = buildIndexPort;
+  }
 
   get state(): State {
     return this.lifecycle.state;
@@ -129,8 +148,7 @@ export class OperationDispatcher {
         { operation: 'initialize', requestId: request.requestId });
     }
 
-    const candidateStore = new BenefitStore(
-      new IndexAdapter(new RTree<IndexedBenefit>(candidateModel.axisCount), candidateModel));
+    const candidateStore = new BenefitStore(this.buildIndexPort(candidateModel));
     this.model = candidateModel;
     this.store = candidateStore;
     this.lifecycle.completeInitialization(priorState, 'success');
