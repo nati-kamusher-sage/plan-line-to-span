@@ -70,7 +70,7 @@ T1  index core               + 0  cumulative  0/48   [merged #2]
 T2  dimension model          + 0  cumulative  0/48   [merged #5]
 T3  span + store             + 0  cumulative  0/48   [merged #6]
 T4  matching                 +11  cumulative 11/48   [merged #7]
-T5  global + zero-dim        + 5  cumulative 16/48
+T5  global + zero-dim        + 5  cumulative 16/48   [merged #8]
 T6  parser + envelope        + 2  cumulative 18/48
 T7  dispatcher/lifecycle     + 9  cumulative 27/48
 T8  validation pipeline      + 5  cumulative 32/48
@@ -144,10 +144,14 @@ Wire matching end to end so the `AC-MATCH-*` cases can run.
 
 ### T5 — global span and zero-dimensional model
 
+**Status: Complete.** Merged as [#8](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/8); see [t5-global-zero-dim.md](pull-requests/t5-global-zero-dim.md).
+
 The all-axis-covering box and the zero-axis model (DEC-14 to DEC-16).
 
 **Cases:** `AC-GLOBAL-01` to `AC-GLOBAL-04`, `AC-ZERO-01`.
 **Tests:** promote `dt-3-representation-probe.mjs`.
+
+**Outcome:** 97 tests pass; all five named cases pass. No production code changed — DEC-14 and DEC-15 were already realized by construction once `spanToBox` existed in T2, and DEC-16 was already covered at the `RTree` level in T1. Also promoted two scenarios the prototype covered beyond the named cases: coexistence of the global benefit with an ordinary one, and confirmation that exact lookup for a non-empty span never returns the global benefit.
 
 ### T6 — request parser and envelope
 
