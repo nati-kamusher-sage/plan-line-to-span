@@ -65,7 +65,7 @@ Tasks are ordered so risk is front-loaded, per DT-10's recommendation. The accep
 
 ```
 T1  index core               + 0  cumulative  0/48   [merged #2]
-T2  dimension model          + 0  cumulative  0/48
+T2  dimension model          + 0  cumulative  0/48   [merged #5]
 T3  span + store             + 0  cumulative  0/48
 T4  matching                 +11  cumulative 11/48
 T5  global + zero-dim        + 5  cumulative 16/48
@@ -101,6 +101,8 @@ Implement the index, generalizing `rbush` under MIT with attribution (DEC-11, DE
 
 ### T2 — dimension model and interval labelling
 
+**Status: Complete.** Merged as [#5](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/5); see [t2-dimension-model.md](pull-requests/t2-dimension-model.md).
+
 Implement `DimensionModelBuilder` and `DimensionModel` (DEC-19 to DEC-22, DEC-25).
 
 - Depth-first `[enter, leave]` labelling; forests sweep roots on a shared counter with no synthetic root.
@@ -109,6 +111,8 @@ Implement `DimensionModelBuilder` and `DimensionModel` (DEC-19 to DEC-22, DEC-25
 
 **Tests:** promote `dt-2-differential.mjs` to a permanent property test — interval containment against a parent-walk oracle over generated models.
 **Cases:** none directly.
+
+**Outcome:** 54 tests pass, including the promoted differential test's 12,000 comparisons at the same seed as the design-phase prototype. **A real defect was caught by that test**: the first implementation of `planLineToPoint` marked an absent dimension with `emptyBox`'s identity, `[Infinity, -Infinity]`, which degenerates in the containment check and incorrectly satisfies a span that constrains the missing dimension. Fixed by using `[Infinity, Infinity]`, which fails against any finite span interval while still passing against the omitted-dimension wildcard. The unit tests written alongside the bug asserted the wrong marker shape and were rewritten to assert observable containment behavior instead.
 
 ### T3 — canonical span and benefit store
 

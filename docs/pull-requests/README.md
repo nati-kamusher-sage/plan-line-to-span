@@ -14,3 +14,4 @@ The two rules that matter most:
 | Task | Description | Pull request |
 |---|---|---|
 | T1 | [t1-index-core.md](t1-index-core.md) | [#2](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/2), merged |
+| T2 | [t2-dimension-model.md](t2-dimension-model.md) | [#5](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/5) |
