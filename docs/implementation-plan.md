@@ -6,7 +6,8 @@
 | Purpose | Sequence the implementation of the Plan Line to Span demo into single-session tasks |
 | Governing input | The approved requirements baseline and the [Preliminary Design](design/dt-10-design-review.md) |
 | Predecessor | [Preliminary Design Execution Plan](preliminary-design-plan.md), complete |
-| Execution model | One AI-assistant task at a time, each on its own branch with a recorded pull-request description |
+| Execution model | One AI-assistant task at a time, each on its own branch and GitHub pull request |
+| Repository | https://github.com/nati-kamusher-sage/plan-line-to-span |
 | Coverage check | [task-coverage-check.mjs](implementation/task-coverage-check.mjs) |
 
 ## 1. Approval gate
@@ -32,15 +33,21 @@ Work proceeds as a sequence of tasks, each performed by an AI assistant in a sin
 
 ### 3.1 Per-task workflow
 
-Every task follows the same cycle:
+Work is hosted at https://github.com/nati-kamusher-sage/plan-line-to-span. Every task follows the same cycle:
 
-1. **Branch.** `git checkout -b <task-id>-<short-slug>` from current `main`, for example `t4-matching`.
-2. **Implement**, following the design records rather than re-deciding what they settle.
-3. **Test.** Add the task's regression tests. The full suite must pass, not only the new tests.
-4. **PR description.** Write `docs/pull-requests/<task-id>-<short-slug>.md` using the template in section 6.
-5. **Commit** the code, tests, and PR description together.
-6. **Report** the outcome, including any design deviation, before the branch is merged.
-7. **Merge** to `main` with `--no-ff` once approved, preserving the task boundary in history.
+1. **Sync.** `git checkout main && git pull origin main`, so the branch starts from what is actually on the remote rather than a stale local copy.
+2. **Branch.** `git checkout -b <task-id>-<short-slug>`, for example `t4-matching`.
+3. **Implement**, following the design records rather than re-deciding what they settle.
+4. **Test.** Add the task's regression tests. The full suite must pass, not only the new tests.
+5. **PR description.** Write `docs/pull-requests/<task-id>-<short-slug>.md` using the template in section 6.
+6. **Commit** the code, tests, and PR description together.
+7. **Push and open a pull request.** `git push -u origin <branch>`, then `gh pr create --base main --body-file docs/pull-requests/<task-id>-<short-slug>.md`. The committed description *is* the PR body, so the two cannot drift apart.
+8. **Report** the outcome, including any design deviation, and wait for review. The assistant does not merge its own work unapproved.
+9. **Merge** once approved, then `git checkout main && git pull origin main` before the next task begins.
+
+### 3.1.1 Why the PR body is a committed file
+
+The description is written to `docs/pull-requests/` and passed to `gh pr create --body-file`. This keeps one authoritative text rather than two, makes the record readable without a GitHub account, and means the rationale survives if the repository is ever moved or the host changes.
 
 ### 3.2 Constraints on the assistant
 
@@ -57,7 +64,7 @@ Every task follows the same cycle:
 Tasks are ordered so risk is front-loaded, per DT-10's recommendation. The acceptance cases each task makes passable are listed; the allocation is verified to cover all 48 exactly once.
 
 ```
-T1  index core               + 0  cumulative  0/48
+T1  index core               + 0  cumulative  0/48   [merged #2]
 T2  dimension model          + 0  cumulative  0/48
 T3  span + store             + 0  cumulative  0/48
 T4  matching                 +11  cumulative 11/48
@@ -76,6 +83,8 @@ T1 through T3 deliver no acceptance cases. That is expected and is not a sign of
 
 ### T1 — n-dimensional R*-tree core
 
+**Status: Complete.** Merged as [#2](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/2); see [t1-index-core.md](pull-requests/t1-index-core.md).
+
 Implement the index, generalizing `rbush` under MIT with attribution (DEC-11, DEC-12).
 
 - Coordinate arrays of arbitrary length, including zero (DT-3 section 5.1).
@@ -84,9 +93,11 @@ Implement the index, generalizing `rbush` under MIT with attribution (DEC-11, DE
 - Node splitting asserts a non-zero axis count (DEC-17).
 - Consume `quickselect` unmodified.
 
-**Resolves open items:** node capacity, split strategy parameters, reinsertion policy; attribution notice placement.
+**Resolves open items:** node capacity, split strategy parameters, reinsertion policy; attribution notice placement; test-runner selection.
 **Tests:** unit tests for insert, remove, search, and split; the zero-axis invariant assertion; property test that search results equal a brute-force filter over the same boxes.
 **Cases:** none directly.
+
+**Outcome:** 30 tests pass. Written in TypeScript under `strict`, with `tsc --noEmit` gating the suite; Node 24 strips types natively, so there is no build step and no test framework. **DEC-12 was deviated from:** `quickselect` supports bulk loading, which this implementation does not have, so importing it would have satisfied the decision without using it. The project has no runtime dependencies.
 
 ### T2 — dimension model and interval labelling
 
