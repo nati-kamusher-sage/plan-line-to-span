@@ -71,7 +71,7 @@ T2  dimension model          + 0  cumulative  0/48   [merged #5]
 T3  span + store             + 0  cumulative  0/48   [merged #6]
 T4  matching                 +11  cumulative 11/48   [merged #7]
 T5  global + zero-dim        + 5  cumulative 16/48   [merged #8]
-T6  parser + envelope        + 2  cumulative 18/48
+T6  parser + envelope        + 2  cumulative 18/48   [merged #9]
 T7  dispatcher/lifecycle     + 9  cumulative 27/48
 T8  validation pipeline      + 5  cumulative 32/48
 T9  benefit operations       +11  cumulative 43/48
@@ -155,6 +155,8 @@ The all-axis-covering box and the zero-axis model (DEC-14 to DEC-16).
 
 ### T6 — request parser and envelope
 
+**Status: Complete.** Merged as [#9](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/9); see [t6-parser-envelope.md](pull-requests/t6-parser-envelope.md).
+
 `RequestParser` compiling the project's JSON Schema at runtime (DEC-40, DEC-41).
 
 - Draft 2020-12 validator.
@@ -164,6 +166,8 @@ The all-axis-covering box and the zero-axis model (DEC-14 to DEC-16).
 **Resolves open items:** validator selection.
 **Cases:** `AC-VAL-03`, `AC-VAL-06`.
 **Tests:** promote `schema-examples-validate` — the eight interface examples must keep validating.
+
+**Outcome:** 122 tests pass; `ajv` moves to a runtime dependency (Draft 2020-12 build). **A toolchain issue was found and worked through:** `ajv`'s shipped `.d.ts` declares an ES-module default export while the shipped JS does a legacy `module.exports = Ajv2020` reassignment, so the two disagree and a plain default import fails `nodenext` type-checking despite working at runtime. Resolved by importing the named export instead, confirmed identical to the default at runtime. A parser-correctness question about the duplicate-member scanner's handling of arrays was checked with two adversarial constructions rather than assumed safe; both pass, and the reasoning is recorded in the code.
 
 ### T7 — dispatcher and lifecycle
 
