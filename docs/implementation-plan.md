@@ -73,12 +73,12 @@ T4  matching                 +11  cumulative 11/48   [merged #7]
 T5  global + zero-dim        + 5  cumulative 16/48   [merged #8]
 T6  parser + envelope        + 2  cumulative 18/48   [merged #9]
 T7  dispatcher/lifecycle     + 9  cumulative 27/48   [merged #10]
-T8  validation pipeline      + 5  cumulative 32/48
-T9  benefit operations       +11  cumulative 43/48
-T10 observability            + 4  cumulative 47/48
-T11 index fault injection    + 1  cumulative 48/48
-T12 performance harness      + 0  cumulative 48/48
-T13 frontend                 + 0  cumulative 48/48
+T8  validation pipeline      + 5  cumulative 32/48   [skipped]
+T9  benefit operations       +11  cumulative 38/48   (of 48; T8's 5 remain open)
+T10 observability            + 4  cumulative 42/48   (of 48; T8's 5 remain open)
+T11 index fault injection    + 1  cumulative 43/48   (of 48; T8's 5 remain open)
+T12 performance harness      + 0  cumulative 43/48   (of 48; T8's 5 remain open)
+T13 frontend                 + 0  cumulative 43/48   (of 48; T8's 5 remain open)
 ```
 
 T1 through T3 deliver no acceptance cases. That is expected and is not a sign of poor sequencing: they build the index, the dimension model, and the store that every later case depends on. Their correctness is established by unit and property tests instead.
@@ -187,6 +187,8 @@ The all-axis-covering box and the zero-axis model (DEC-14 to DEC-16).
 **Outcome:** 150 tests pass. ISSUE-D2 resolved for the demo by not modelling an HTTP status at this layer at all — `error.code` remains the sole authority per DT-1 DEC-4. `AC-INIT-06` (an operation submitted while initializing) is satisfied by a narrow test-only accessor exposing `LifecycleState` directly, matching DT-9's anticipation that no new seam was needed, since DEC-39's synchronous handlers mean genuine concurrent interleaving cannot arise to test against. **Two defects surfaced and were fixed:** T6's `ParsedRequest` union grouped two operations under one interface with a union-valued discriminant, which defeated `Extract`-based type narrowing; split into one interface per operation. Separately, `if (a.op === 'x' || a.op === 'y') { a.payload }` does not narrow a discriminated union in TypeScript the way a single equality check does — confirmed with an isolated reproduction before accepting it as real behavior rather than a misconfiguration.
 
 ### T8 — validation pipeline
+
+**Status: Skipped**, by explicit user instruction, in favor of proceeding directly to T9. `AC-VAL-01`, `AC-VAL-02`, `AC-VAL-04`, `AC-VAL-05`, and `AC-VAL-07` remain open; the cumulative counts for T9 onward are annotated accordingly rather than silently absorbed. No `FormulaValidator` exists yet, so `formula` is currently unvalidated end to end — `INVALID_FORMULA` is a declared response code (`response.ts`) with nothing that produces it.
 
 `FormulaValidator` and the ordered pipeline (DEC-43, DEC-44).
 
