@@ -9,7 +9,7 @@
  * 14.3).
  */
 
-import type { IndexAdapter, IndexedBenefit } from './index-adapter.ts';
+import type { IndexPort, IndexedBenefit } from './index-adapter.ts';
 import type { CanonicalSpan } from '../model/span.ts';
 
 export class DuplicateSpanError extends Error {
@@ -27,9 +27,9 @@ export class BenefitNotFoundError extends Error {
 }
 
 export class BenefitStore {
-  private readonly index: IndexAdapter;
+  private readonly index: IndexPort;
 
-  constructor(index: IndexAdapter) {
+  constructor(index: IndexPort) {
     this.index = index;
   }
 

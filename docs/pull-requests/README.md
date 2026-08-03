@@ -23,3 +23,4 @@ The two rules that matter most:
 | T8 | Skipped by explicit instruction | n/a |
 | T9 | [t9-benefit-operations.md](t9-benefit-operations.md) | [#11](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/11) |
 | T10 | [t10-observability.md](t10-observability.md) | [#12](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/12) |
+| T11 | [t11-index-fault-injection.md](t11-index-fault-injection.md) | [#13](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/13) |
