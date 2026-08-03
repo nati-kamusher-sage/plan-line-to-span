@@ -59,6 +59,8 @@ The description is written to `docs/pull-requests/` and passed to `gh pr create 
 
 **Report honestly.** If a task is partially done, say which parts. If a test is skipped, say so and why. A green report that hides a skipped case corrupts every later decision that relies on it.
 
+**No TypeScript parameter-property constructor shorthand.** Found during T3: `constructor(public readonly x: T)` type-checks under `tsc --noEmit` but fails at runtime under Node's strip-only mode with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`. The type checker cannot catch this, because the code is valid TypeScript — the gap is in what the runtime stripper supports, not in types. Declare fields explicitly and assign them in the constructor body instead.
+
 ## 4. Task sequence
 
 Tasks are ordered so risk is front-loaded, per DT-10's recommendation. The acceptance cases each task makes passable are listed; the allocation is verified to cover all 48 exactly once.
@@ -66,7 +68,7 @@ Tasks are ordered so risk is front-loaded, per DT-10's recommendation. The accep
 ```
 T1  index core               + 0  cumulative  0/48   [merged #2]
 T2  dimension model          + 0  cumulative  0/48   [merged #5]
-T3  span + store             + 0  cumulative  0/48
+T3  span + store             + 0  cumulative  0/48   [merged #6]
 T4  matching                 +11  cumulative 11/48
 T5  global + zero-dim        + 5  cumulative 16/48
 T6  parser + envelope        + 2  cumulative 18/48
@@ -116,6 +118,8 @@ Implement `DimensionModelBuilder` and `DimensionModel` (DEC-19 to DEC-22, DEC-25
 
 ### T3 — canonical span and benefit store
 
+**Status: Complete.** Merged as [#6](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/6); see [t3-span-store.md](pull-requests/t3-span-store.md).
+
 Implement `CanonicalSpan`, `SpanResolver`, and `BenefitStore` over `IndexAdapter` (DEC-24, DEC-31).
 
 - Canonical key with member-order independence.
@@ -124,6 +128,8 @@ Implement `CanonicalSpan`, `SpanResolver`, and `BenefitStore` over `IndexAdapter
 
 **Tests:** unit tests for canonicalization, duplicate detection, and absence.
 **Cases:** none directly.
+
+**Outcome:** 78 tests pass, including an adversarial exact-lookup case: `RTree.search` returns every stored box that *contains* the query, so a child span's own box can surface a wider stored ancestor too. `IndexAdapter.findExact` uses geometry only to narrow candidates and decides identity by `CanonicalSpan.equals`, which is what DEC-24 requires and what keeps AC-BEN-05 correct. **A toolchain defect was found and fixed:** TypeScript's parameter-property constructor shorthand (`constructor(public readonly x: T)`) type-checks cleanly but fails at runtime under Node's strip-only mode with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`. `tsc --noEmit` cannot catch this since the code is valid TypeScript — it is a runtime capability gap invisible to the type checker. Four sites were rewritten as explicit field declarations. **This is now a standing constraint on every later task:** do not use parameter-property shorthand anywhere in `src/` or `test/`.
 
 ### T4 — employee matching
 
