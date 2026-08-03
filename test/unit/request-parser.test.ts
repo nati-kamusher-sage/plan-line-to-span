@@ -133,7 +133,11 @@ test('a null formula is accepted by RequestParser; only FormulaValidator may rej
   });
   const parsed = parseRequest(raw);
   assert.equal(parsed.operation, 'createBenefit');
-  if (parsed.operation === 'createBenefit' || parsed.operation === 'updateBenefit') {
+  // `if (a === 'x' || a === 'y')` does not narrow a discriminated union in
+  // TypeScript the way a single `===` check does -- each branch of the `||`
+  // narrows independently, but the combined condition's body sees the
+  // original union again. A single equality check narrows correctly.
+  if (parsed.operation === 'createBenefit') {
     assert.equal(parsed.payload.formula, null);
   }
 });

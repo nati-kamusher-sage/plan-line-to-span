@@ -18,4 +18,5 @@ The two rules that matter most:
 | T3 | [t3-span-store.md](t3-span-store.md) | [#6](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/6), merged |
 | T4 | [t4-matching.md](t4-matching.md) | [#7](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/7), merged |
 | T5 | [t5-global-zero-dim.md](t5-global-zero-dim.md) | [#8](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/8), merged |
-| T6 | [t6-parser-envelope.md](t6-parser-envelope.md) | [#9](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/9) |
+| T6 | [t6-parser-envelope.md](t6-parser-envelope.md) | [#9](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/9), merged |
+| T7 | [t7-dispatcher-lifecycle.md](t7-dispatcher-lifecycle.md) | [#10](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/10) |
