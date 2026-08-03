@@ -69,7 +69,7 @@ Tasks are ordered so risk is front-loaded, per DT-10's recommendation. The accep
 T1  index core               + 0  cumulative  0/48   [merged #2]
 T2  dimension model          + 0  cumulative  0/48   [merged #5]
 T3  span + store             + 0  cumulative  0/48   [merged #6]
-T4  matching                 +11  cumulative 11/48
+T4  matching                 +11  cumulative 11/48   [merged #7]
 T5  global + zero-dim        + 5  cumulative 16/48
 T6  parser + envelope        + 2  cumulative 18/48
 T7  dispatcher/lifecycle     + 9  cumulative 27/48
@@ -133,10 +133,14 @@ Implement `CanonicalSpan`, `SpanResolver`, and `BenefitStore` over `IndexAdapter
 
 ### T4 — employee matching
 
+**Status: Complete.** Merged as [#7](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/7); see [t4-matching.md](pull-requests/t4-matching.md).
+
 Wire matching end to end so the `AC-MATCH-*` cases can run.
 
 **Cases:** `AC-MATCH-01` to `AC-MATCH-11`, including the section 12 scenario.
 **Tests:** promote `dt-2-verify.mjs`; add the DEC-13 differential test against a naive linear-scan matcher.
+
+**Outcome:** 90 tests pass; all eleven `AC-MATCH-*` cases pass against the real domain stack rather than the design prototype's stand-in. Cumulative 11/48. The DEC-13 differential test's first run reported a mismatch that a thorough investigation — a controlled `RTree` stress test, a full tree dump, and a hand-verified oracle — traced not to `RTree` or `BenefitStore` but to the test's own bookkeeping: it indexed stored spans by array position while skipping duplicates, so the position drifted from the formula value the moment any duplicate was skipped. Fixed by keying stored spans by formula. Both the index and the store were correct throughout; only the test's accounting was wrong.
 
 ### T5 — global span and zero-dimensional model
 
