@@ -22,3 +22,4 @@ The two rules that matter most:
 | T7 | [t7-dispatcher-lifecycle.md](t7-dispatcher-lifecycle.md) | [#10](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/10) |
 | T8 | Skipped by explicit instruction | n/a |
 | T9 | [t9-benefit-operations.md](t9-benefit-operations.md) | [#11](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/11) |
+| T10 | [t10-observability.md](t10-observability.md) | [#12](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/12) |

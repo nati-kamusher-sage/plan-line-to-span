@@ -58,6 +58,20 @@ export class OperationDispatcher {
     return this.store?.count ?? 0;
   }
 
+  /**
+   * The loaded model's dimension and dimension-value counts, or 0 before any
+   * model exists. Exposed alongside `benefitCount` and `state` so
+   * `ObservabilityEmitter` can read every Obs 3/4 field it needs after an
+   * operation completes without reaching into a `Response`'s untyped `data`.
+   */
+  get dimensionCount(): number {
+    return this.model?.dimensionCount ?? 0;
+  }
+
+  get dimensionValueCount(): number {
+    return this.model?.dimensionValueCount ?? 0;
+  }
+
   dispatch(raw: string): Response {
     let request: ParsedRequest;
     try {

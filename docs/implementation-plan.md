@@ -208,10 +208,14 @@ Create, update, delete, and exact query end to end.
 
 ### T10 — observability
 
+**Status: Complete.** Merged as [#12](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/12); see [t10-observability.md](pull-requests/t10-observability.md).
+
 `ObservabilityEmitter`: decorator, closed-field builder, stdout sink (DEC-52 to DEC-59).
 
 **Cases:** `AC-OBS-01` to `AC-OBS-04`.
 **Tests:** promote `dt-8-log-builder.mjs`; add `capture-stdout` and the `emitter-sole-stdout-writer` static check.
+
+**Outcome:** 187 tests pass. `OperationDispatcher` gained `dimensionCount`/`dimensionValueCount` getters alongside the existing `benefitCount`, so the emitter reads dispatcher state consistently rather than parsing `Response.data` for two of three counts. A test bug in `AC-OBS-04`'s first draft (a bare substring check for `"span"` that false-matched the event name `plan_line_to_span.operation_completed`) was caught by running the test and fixed to check for the field name instead. T8 remains skipped, so `INVALID_FORMULA` still has no exercised path anywhere, including through the emitter.
 
 ### T11 — index fault injection
 
