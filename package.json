@@ -1,0 +1,13 @@
+{
+  "name": "plan-line-to-span-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Plan Line to Span demo. Documentation-led; see docs/implementation-plan.md.",
+  "scripts": {
+    "prototypes": "for f in docs/design/prototypes/dt-*.mjs; do echo \"== $f\"; node \"$f\" || exit 1; done"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}
