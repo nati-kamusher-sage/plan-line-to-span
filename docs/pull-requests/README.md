@@ -20,3 +20,5 @@ The two rules that matter most:
 | T5 | [t5-global-zero-dim.md](t5-global-zero-dim.md) | [#8](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/8), merged |
 | T6 | [t6-parser-envelope.md](t6-parser-envelope.md) | [#9](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/9), merged |
 | T7 | [t7-dispatcher-lifecycle.md](t7-dispatcher-lifecycle.md) | [#10](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/10) |
+| T8 | Skipped by explicit instruction | n/a |
+| T9 | [t9-benefit-operations.md](t9-benefit-operations.md) | [#11](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/11) |

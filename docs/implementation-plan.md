@@ -197,10 +197,14 @@ The all-axis-covering box and the zero-axis model (DEC-14 to DEC-16).
 
 ### T9 — benefit operations
 
+**Status: Complete.** Merged as [#11](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/11); see [t9-benefit-operations.md](pull-requests/t9-benefit-operations.md).
+
 Create, update, delete, and exact query end to end.
 
 **Cases:** `AC-BEN-01` to `AC-BEN-11`.
 **Tests:** full lifecycle sequences; opaque-formula preservation with a sentinel.
+
+**Outcome:** 161 tests pass. No production code changed — T3's `BenefitStore` and T7's `OperationDispatcher` already implemented every behavior these cases require; this task verified it end to end through the contract surface. All 11 cases passed on the first run. `AC-BEN-11`'s structural-preservation half is verified; its log-privacy half is deferred to T10, which does not exist yet. T8 was skipped by explicit instruction, so `formula` remains unvalidated (`INVALID_FORMULA` is declared but unreachable).
 
 ### T10 — observability
 
