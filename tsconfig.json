@@ -6,6 +6,7 @@
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
     "noEmit": true,
 
     "strict": true,
