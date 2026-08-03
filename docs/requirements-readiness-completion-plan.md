@@ -6,7 +6,7 @@
 | Purpose | Close the remaining elicitation gaps before the requirements specification is drafted and baselined |
 | Scope | Plan Line to Span demo |
 | Governing input | [Operational Concept](operational-concept.md) |
-| Historical inputs | [Operational Concept Context](archive/operational-concept-context.md) and [Reflections](archive/reflectsions.md) |
+| Historical inputs | [Operational Concept Context](archive/operational-concept-context.md) and [General Concepts](archive/general-concepts.md) |
 
 ## 1. Objective
 

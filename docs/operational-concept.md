@@ -12,7 +12,7 @@
 | Observability contract | [Plan Line to Span Observability Contract](observability-contract.md) |
 | Acceptance cases | [Plan Line to Span Acceptance Cases](acceptance-cases.md) |
 | Readiness review | [Plan Line to Span Readiness and Consistency Review](readiness-review.md) |
-| Historical sources | [Operational Concept Context](archive/operational-concept-context.md) and [Reflections](archive/reflectsions.md) |
+| Historical sources | [Operational Concept Context](archive/operational-concept-context.md) and [General Concepts](archive/general-concepts.md) |
 
 ## 1. Purpose
 
