@@ -4,14 +4,6 @@ import type { RTree } from '../index/rtree.ts';
 import type { DimensionModel } from '../model/dimension-model.ts';
 import type { CanonicalSpan } from '../model/span.ts';
 
-/** Test seam retained through E1; exception translation is removed in E2. */
-export class IndexFailureError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'IndexFailureError';
-  }
-}
-
 export interface IndexPort {
   readonly size: number;
   insert(span: CanonicalSpan): void;

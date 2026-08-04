@@ -101,13 +101,9 @@ test('SpanStore.match agrees with a naive scan-and-check oracle', () => {
       for (const g of generated) {
         if (rnd() < 0.5) span[g.definition.id] = g.values[randInt(g.values.length)]!.key;
       }
-      try {
-        const canonical = resolveSpan(span, model);
-        store.create(canonical);
-        storedSpans.set(canonical.key, span);
-      } catch {
-        // duplicate canonical span; skip
-      }
+      const canonical = resolveSpan(span);
+      const result = store.create(canonical);
+      if (result.ok) storedSpans.set(canonical.key, span);
     }
 
     for (let q = 0; q < 15; q++) {

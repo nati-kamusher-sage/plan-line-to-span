@@ -77,7 +77,7 @@ interface VolumeResult {
 function buildIndexedTree(built: BuiltVolume): RTree<number> {
   const tree = new RTree<number>(built.model.axisCount);
   built.spans.forEach((span, i) => {
-    const canonical = resolveSpan(span, built.model);
+    const canonical = resolveSpan(span);
     tree.insert(built.model.spanToBox(canonical.dimensions), i);
   });
   return tree;
@@ -130,7 +130,7 @@ function runNaiveControl(): VolumeResult {
   const at8N = buildVolume(SEED, volume, maxSpans, maxSpans);
 
   const entriesOf = (built: BuiltVolume) => built.spans.map(span => {
-    const canonical = resolveSpan(span, built.model);
+    const canonical = resolveSpan(span);
     return { box: built.model.spanToBox(canonical.dimensions) };
   });
 

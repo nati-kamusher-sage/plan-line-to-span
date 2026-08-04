@@ -57,7 +57,7 @@ test('AC-OBS-01: a successful create, planLine query with one match, and delete 
   assert.equal(deleteRec!['outcome'], 'success');
 });
 
-test('AC-OBS-02: an unknown-dimension create and an absent delete each produce a warn record with an unchanged spanCount', () => {
+test('AC-OBS-02: a duplicate create and an absent delete each produce a warn record with an unchanged spanCount', () => {
   const { emitter, records } = capturingEmitter();
   emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE }));
   emitter.dispatch(JSON.stringify({
@@ -65,20 +65,20 @@ test('AC-OBS-02: an unknown-dimension create and an absent delete each produce a
   }));
 
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'createSpan', payload: { span: { unknown: 'x' } },
+    contractVersion: V, operation: 'createSpan', payload: { span: { location: '4' } },
   }));
   emitter.dispatch(JSON.stringify({
     contractVersion: V, operation: 'deleteSpan', payload: { span: { location: '21' } },
   }));
 
   const recs = records();
-  const [, , unknownDimRec, absentDeleteRec] = recs;
+  const [, , duplicateRec, absentDeleteRec] = recs;
 
-  assert.equal(unknownDimRec!['level'], 'warn');
-  assert.equal(unknownDimRec!['outcome'], 'failure');
-  assert.equal(unknownDimRec!['errorCode'], 'UNKNOWN_DIMENSION');
-  assert.equal(unknownDimRec!['spanCount'], 1);
-  assert.ok(!('matchCount' in unknownDimRec!));
+  assert.equal(duplicateRec!['level'], 'warn');
+  assert.equal(duplicateRec!['outcome'], 'failure');
+  assert.equal(duplicateRec!['errorCode'], 'DUPLICATE_SPAN');
+  assert.equal(duplicateRec!['spanCount'], 1);
+  assert.ok(!('matchCount' in duplicateRec!));
 
   assert.equal(absentDeleteRec!['level'], 'warn');
   assert.equal(absentDeleteRec!['outcome'], 'failure');
@@ -117,8 +117,15 @@ test('AC-OBS-04: span, plan-line, and request identifiers never appear in captur
   const { emitter, records } = capturingEmitter();
   const SENTINEL_SPAN = 'sekrit-span-9f2b1c';
   const SENTINEL_VALUE = 'sekrit-value-4d8e2a';
+  const sentinelFile = {
+    format: 'plan-line-to-span-dimensions/v1',
+    dimensions: [{
+      id: 'location', name: 'Location',
+      values: [{ key: SENTINEL_SPAN, name: 'Sentinel' }, { key: '20', name: 'NYC', parentKey: SENTINEL_SPAN }],
+    }],
+  };
 
-  emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE }));
+  emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: sentinelFile }));
   emitter.dispatch(JSON.stringify({
     contractVersion: V, operation: 'createSpan',
     payload: { span: { location: SENTINEL_SPAN } },
@@ -139,4 +146,13 @@ test('AC-OBS-04: span, plan-line, and request identifiers never appear in captur
     assert.ok(!('planLine' in rec), `a plan-line field leaked into a record: ${line}`);
     assert.ok(!('requestId' in rec), `a requestId field leaked into a record: ${line}`);
   }
+});
+
+test('a sink failure propagates under optimistic execution', () => {
+  const sink: LogSink = { write: () => { throw new Error('sink unavailable'); } };
+  const emitter = new ObservabilityEmitter(new OperationDispatcher(), sink);
+  assert.throws(
+    () => emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE })),
+    /sink unavailable/,
+  );
 });

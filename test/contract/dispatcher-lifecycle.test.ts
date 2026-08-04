@@ -1,10 +1,6 @@
 /**
- * AC-INIT-01 through AC-INIT-08, and AC-SERIAL-01, driving the real
+ * Active AC-INIT cases and AC-SERIAL-01, driving the real
  * OperationDispatcher end to end: raw JSON string in, Response out.
- *
- * AC-INIT-09 (INDEX_FAILURE via fault injection) is deliberately not covered
- * here -- DT-9's inject-index-failure capability is what makes it
- * executable, and that seam is T9's/T11's to build.
  */
 
 import { test } from 'node:test';
@@ -18,10 +14,10 @@ function initRequest(payload: unknown = D1_FILE, requestId?: string): string {
   return JSON.stringify({ contractVersion: V, operation: 'initialize', payload, ...(requestId ? { requestId } : {}) });
 }
 
-const DANGLING_PARENT_FILE = {
-  format: 'plan-line-to-span-dimensions/v1',
-  dimensions: [{ id: 'location', name: 'L', values: [{ key: '20', name: 'NYC', parentKey: '999' }] }],
-};
+function forceFailed(dispatcher: OperationDispatcher): void {
+  const prior = dispatcher.testOnlyLifecycle.beginInitializing();
+  dispatcher.testOnlyLifecycle.completeInitialization(prior, 'failure');
+}
 
 test('AC-INIT-01: first initialize succeeds with dimensionCount and empty spanCount', () => {
   const d = new OperationDispatcher();
@@ -33,18 +29,9 @@ test('AC-INIT-01: first initialize succeeds with dimensionCount and empty spanCo
   assert.equal(d.state, 'ready');
 });
 
-test('AC-INIT-02: an invalid dimension hierarchy (dangling parentKey) enters Failed', () => {
-  const d = new OperationDispatcher();
-  const res = d.dispatch(initRequest(DANGLING_PARENT_FILE));
-  assert.equal(res.ok, false);
-  if (!res.ok) assert.equal(res.error.code, 'INVALID_DIMENSION_DEFINITION');
-  assert.equal(d.state, 'failed');
-  assert.equal(d.spanCount, 0, 'no usable model or spans');
-});
-
 test('AC-INIT-03: initialize is accepted from Failed and succeeds', () => {
   const d = new OperationDispatcher();
-  d.dispatch(initRequest(DANGLING_PARENT_FILE));
+  forceFailed(d);
   assert.equal(d.state, 'failed');
 
   const res = d.dispatch(initRequest());
@@ -65,26 +52,6 @@ test('AC-INIT-04: reinitialization atomically clears all prior spans', () => {
   if (res.ok) assert.deepEqual(res.data, { state: 'ready', dimensionCount: 2, spanCount: 0 });
   assert.equal(d.state, 'ready');
   assert.equal(d.spanCount, 0);
-});
-
-test('AC-INIT-05: a failed reinitialization returns to Ready with the previous spans intact', () => {
-  const d = new OperationDispatcher();
-  d.dispatch(initRequest());
-  d.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'createSpan', payload: { span: { location: '4' } },
-  }));
-  assert.equal(d.spanCount, 1);
-
-  const res = d.dispatch(initRequest(DANGLING_PARENT_FILE));
-  assert.equal(res.ok, false);
-  if (!res.ok) assert.equal(res.error.code, 'INVALID_DIMENSION_DEFINITION');
-  assert.equal(d.state, 'ready', 'a failed reinitialization returns to Ready, not Failed');
-  assert.equal(d.spanCount, 1, 'the prior span remains');
-
-  const queried = d.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'querySpan', payload: { span: { location: '4' } },
-  }));
-  assert.equal(queried.ok, true, 'the prior span is still queryable');
 });
 
 test('AC-INIT-06: an operation submitted while initializing is rejected with INVALID_STATE', () => {
@@ -121,7 +88,7 @@ test('AC-INIT-07: a span operation before initialization is rejected with INVALI
 
 test('AC-INIT-08: from Failed, only initialize is accepted; every other operation is INVALID_STATE with details.state', () => {
   const d = new OperationDispatcher();
-  d.dispatch(initRequest(DANGLING_PARENT_FILE));
+  forceFailed(d);
   assert.equal(d.state, 'failed');
 
   const attempts = [
@@ -172,7 +139,7 @@ test('requestId is echoed on both success and failure', () => {
   assert.equal(ok.requestId, 'req-1');
 
   const err = d.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'querySpan', payload: { span: { unknown: 'x' } }, requestId: 'req-2',
+    contractVersion: V, operation: 'querySpan', payload: { span: { location: '4' } }, requestId: 'req-2',
   }));
   assert.equal(err.requestId, 'req-2');
 });

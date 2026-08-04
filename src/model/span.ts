@@ -13,38 +13,8 @@
  * of the original object.
  */
 
-/** Thrown when a span or plan line names a dimension the loaded model lacks. */
-export class UnknownDimensionError extends Error {
-  readonly dimensionId: string;
-
-  constructor(dimensionId: string) {
-    super(`unknown dimension: ${dimensionId}`);
-    this.name = 'UnknownDimensionError';
-    this.dimensionId = dimensionId;
-  }
-}
-
-/** Thrown when a span or plan line uses a value key the named dimension lacks. */
-export class UnknownDimensionValueError extends Error {
-  readonly dimensionId: string;
-  readonly key: string;
-
-  constructor(dimensionId: string, key: string) {
-    super(`unknown value for ${dimensionId}: ${key}`);
-    this.name = 'UnknownDimensionValueError';
-    this.dimensionId = dimensionId;
-    this.key = key;
-  }
-}
-
-/** A resolver capable of checking dimension identifiers and values. */
-export interface DimensionChecker {
-  hasDimension(id: string): boolean;
-  hasValue(dimensionId: string, key: string): boolean;
-}
-
 /**
- * A validated span, identified by a key that does not depend on member order
+ * A canonical span, identified by a key that does not depend on member order
  * or on the dimension model's geometry.
  *
  * The `dimensions` map is exposed for callers that need the original
@@ -81,21 +51,11 @@ function canonicalKey(dimensions: Readonly<Record<string, string>>): string {
 }
 
 /**
- * Validates a span or plan line's dimension-value pairs against the loaded
- * model, throwing `UnknownDimensionError` or `UnknownDimensionValueError` on
- * the first problem found. On success, returns the canonical span.
- *
- * Used for both spans and plan lines: a plan line is a dimension-value map in
- * exactly the same shape, and OC 9.2's presence rule is enforced later, by
- * `DimensionModel.planLineToPoint`, not here.
+ * Canonicalizes a span without checking its domain meaning. ECP-1 makes the
+ * caller responsible for supplying identifiers and values from the model.
  */
 export function resolveSpan(
   dimensions: Readonly<Record<string, string>>,
-  model: DimensionChecker,
 ): CanonicalSpan {
-  for (const [dimensionId, key] of Object.entries(dimensions)) {
-    if (!model.hasDimension(dimensionId)) throw new UnknownDimensionError(dimensionId);
-    if (!model.hasValue(dimensionId, key)) throw new UnknownDimensionValueError(dimensionId, key);
-  }
   return CanonicalSpan.of(dimensions);
 }

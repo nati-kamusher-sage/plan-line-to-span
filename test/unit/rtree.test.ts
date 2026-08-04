@@ -6,16 +6,6 @@ import { fullBox, type Box } from '../../src/index/box.ts';
 const point = (...coords: number[]): Box => coords.map(c => [c, c] as const);
 const NO_AXES: Box = [];
 
-test('rejects a negative or non-integer axis count', () => {
-  assert.throws(() => new RTree(-1), TypeError);
-  assert.throws(() => new RTree(1.5), TypeError);
-});
-
-test('rejects a box whose axis count does not match the tree', () => {
-  const t = new RTree<string>(2);
-  assert.throws(() => t.insert([[0, 1]], 'a'), TypeError);
-});
-
 test('insert and search on one axis', () => {
   const t = new RTree<string>(1);
   t.insert([[0, 10]], 'wide');
@@ -111,14 +101,4 @@ test('a zero-axis tree supports removal', () => {
   assert.equal(t.remove(r => r === 'global'), true);
   assert.equal(t.size, 0);
   assert.deepEqual(t.search(NO_AXES), []);
-});
-
-test('a zero-axis tree asserts rather than splitting', () => {
-  // DEC-17: unreachable in the real system, because only one span is
-  // expressible when no dimensions exist. Forced here to prove it fails loudly.
-  const t = new RTree<number>(0, { maxEntries: 4 });
-  assert.throws(
-    () => { for (let i = 0; i < 20; i++) t.insert(NO_AXES, i); },
-    /invariant violated: a zero-dimensional index cannot hold enough entries to split/,
-  );
 });

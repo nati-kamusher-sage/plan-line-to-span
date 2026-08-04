@@ -1,5 +1,5 @@
 /**
- * Dimension model: validates a dimension definition and builds the interval
+ * Dimension model: builds the interval
  * labelling that DT-2 uses to turn hierarchy into geometry.
  *
  * A depth-first traversal assigns each value an `[enter, leave]` pair so that
@@ -39,15 +39,6 @@ export interface DimensionFile {
 
 export const DIMENSION_FILE_FORMAT = 'plan-line-to-span-dimensions/v1';
 
-/** The nine-code contract vocabulary is not reused here; this is the one
- * validation failure a dimension file can produce (IC 6). */
-export class InvalidDimensionDefinitionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'InvalidDimensionDefinitionError';
-  }
-}
-
 /** One labelled dimension: its declared values and their intervals. */
 interface LabelledDimension {
   readonly id: string;
@@ -57,7 +48,7 @@ interface LabelledDimension {
 }
 
 /**
- * A validated, immutable dimension model.
+ * An immutable dimension model built from caller-trusted input.
  *
  * Axis order is the dimension order in the definition (DEC-19). Axis count may
  * be zero, which DT-3 requires and which `RTree` already supports.
@@ -84,32 +75,19 @@ export class DimensionModel {
     return this.dims.reduce((sum, d) => sum + d.valueCount, 0);
   }
 
-  hasDimension(id: string): boolean {
-    return this.axisOf.has(id);
-  }
-
-  hasValue(dimensionId: string, key: string): boolean {
-    const dim = this.dims[this.axisOf.get(dimensionId)!];
-    return dim !== undefined && dim.intervals.has(key);
-  }
-
   /**
    * A span's box: the value's own interval on each constrained axis, the
    * whole axis where the span omits a dimension (DEC-23's counterpart for
    * spans, and DT-3's global-span wildcard).
    *
-   * Callers must validate dimension identifiers and values before calling
-   * this; it throws on either, since `SpanResolver` owns those checks and
-   * should never let an invalid span reach the model.
+   * Inputs are assumed to reference declared identifiers and values.
    */
   spanToBox(span: Readonly<Record<string, string>>): Box {
     const box: MutableBox = fullBox(this.axisCount);
     for (const [dimId, key] of Object.entries(span)) {
-      const axis = this.axisOf.get(dimId);
-      if (axis === undefined) throw new Error(`unknown dimension: ${dimId}`);
+      const axis = this.axisOf.get(dimId)!;
       const dim = this.dims[axis]!;
-      const interval = dim.intervals.get(key);
-      if (!interval) throw new Error(`unknown value for ${dimId}: ${key}`);
+      const interval = dim.intervals.get(key)!;
       box[axis] = [interval[0], interval[1]];
     }
     return box;
@@ -136,11 +114,9 @@ export class DimensionModel {
   planLineToPoint(planLine: Readonly<Record<string, string>>): Box {
     const point: MutableBox = this.dims.map(() => [Infinity, Infinity]);
     for (const [dimId, key] of Object.entries(planLine)) {
-      const axis = this.axisOf.get(dimId);
-      if (axis === undefined) throw new Error(`unknown dimension: ${dimId}`);
+      const axis = this.axisOf.get(dimId)!;
       const dim = this.dims[axis]!;
-      const interval = dim.intervals.get(key);
-      if (!interval) throw new Error(`unknown value for ${dimId}: ${key}`);
+      const interval = dim.intervals.get(key)!;
       point[axis] = [interval[0], interval[1]];
     }
     return point;
@@ -153,32 +129,15 @@ export class DimensionModel {
 }
 
 /**
- * Validates a dimension definition and builds the candidate model.
- *
- * Rejects (IC 6, `INVALID_DIMENSION_DEFINITION`):
- *   - an unsupported or missing format identifier
- *   - duplicate dimension identifiers
- *   - duplicate value keys within a dimension
- *   - a parentKey that does not identify a value in the same dimension
- *   - cycles in a value hierarchy
+ * Builds a candidate model from a caller-trusted dimension definition.
  *
  * Builds nothing on the live model; the caller (T5's dispatcher) is
  * responsible for the atomic swap DT-5 describes.
  */
 export function buildDimensionModel(file: DimensionFile): DimensionModel {
-  if (file.format !== DIMENSION_FILE_FORMAT) {
-    throw new InvalidDimensionDefinitionError(
-      `unsupported format: ${JSON.stringify(file.format)}`);
-  }
-
-  const seenDimensionIds = new Set<string>();
   const labelled: LabelledDimension[] = [];
 
   for (const dim of file.dimensions) {
-    if (seenDimensionIds.has(dim.id)) {
-      throw new InvalidDimensionDefinitionError(`duplicate dimension id: ${dim.id}`);
-    }
-    seenDimensionIds.add(dim.id);
     labelled.push(labelDimension(dim));
   }
 
@@ -186,33 +145,17 @@ export function buildDimensionModel(file: DimensionFile): DimensionModel {
 }
 
 function labelDimension(dim: DimensionDefinition): LabelledDimension {
-  const parentOf = new Map<string, string | undefined>();
   const childrenOf = new Map<string, string[]>();
   const roots: string[] = [];
-
-  for (const v of dim.values) {
-    if (parentOf.has(v.key)) {
-      throw new InvalidDimensionDefinitionError(
-        `duplicate value key in dimension ${dim.id}: ${v.key}`);
-    }
-    parentOf.set(v.key, v.parentKey);
-  }
 
   for (const v of dim.values) {
     if (v.parentKey === undefined) {
       roots.push(v.key);
       continue;
     }
-    if (!parentOf.has(v.parentKey)) {
-      throw new InvalidDimensionDefinitionError(
-        `dimension ${dim.id}: value ${v.key} has parentKey ${v.parentKey}, ` +
-        `which does not identify a value in the same dimension`);
-    }
     if (!childrenOf.has(v.parentKey)) childrenOf.set(v.parentKey, []);
     childrenOf.get(v.parentKey)!.push(v.key);
   }
-
-  detectCycles(dim.id, parentOf);
 
   // Depth-first traversal over a shared counter (DEC-20). Sweeping each root
   // in turn (DEC-22) keeps root subtrees disjoint without a synthetic root:
@@ -229,25 +172,4 @@ function labelDimension(dim: DimensionDefinition): LabelledDimension {
   for (const root of roots) visit(root);
 
   return { id: dim.id, intervals, valueCount: dim.values.length };
-}
-
-/**
- * Detects a cycle by walking each value's parent chain. A well-formed forest
- * has every chain terminate at a root within `parentOf.size` steps; a cycle
- * means some chain never terminates, so a step budget catches it without
- * needing cycle-specific bookkeeping.
- */
-function detectCycles(dimensionId: string, parentOf: ReadonlyMap<string, string | undefined>): void {
-  for (const start of parentOf.keys()) {
-    let current: string | undefined = start;
-    let steps = 0;
-    const limit = parentOf.size + 1;
-    while (current !== undefined) {
-      current = parentOf.get(current);
-      if (++steps > limit) {
-        throw new InvalidDimensionDefinitionError(
-          `dimension ${dimensionId}: hierarchy cycle involving ${start}`);
-      }
-    }
-  }
 }

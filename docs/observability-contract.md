@@ -4,7 +4,7 @@
 |---|---|
 | Contract name | `plan-line-to-span-observability` |
 | Version | ECP-1 target `v1` |
-| Status | Target contract; implementation follows in E1/E2 |
+| Status | ECP-1 executable contract; E1 and E2 implemented |
 | Governing behavior | [Operational Concept](operational-concept.md) |
 
 ## 1. Scope

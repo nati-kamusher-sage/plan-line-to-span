@@ -54,12 +54,7 @@ export class HttpTransportAdapter {
     this.dispatcher = options.dispatcher;
     this.staticDir = options.staticDir;
     this.server = createServer((req, res) => {
-      this.handleRequest(req, res).catch(() => {
-        if (!res.headersSent) {
-          res.writeHead(500, { 'content-type': 'text/plain' });
-        }
-        res.end('internal error');
-      });
+      void this.handleRequest(req, res);
     });
   }
 

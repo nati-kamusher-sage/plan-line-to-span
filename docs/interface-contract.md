@@ -4,7 +4,7 @@
 |---|---|
 | Contract name | `plan-line-to-span` |
 | Contract version | `v1` |
-| Status | ECP-1 target contract; spans-only executable surface implemented in E1 |
+| Status | ECP-1 executable contract; E1 and E2 implemented |
 | Governing behavior | [Operational Concept](operational-concept.md) |
 | Executable schema | [plan-line-to-span-v1.schema.json](schemas/plan-line-to-span-v1.schema.json) |
 

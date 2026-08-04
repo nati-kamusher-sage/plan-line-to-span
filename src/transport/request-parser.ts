@@ -2,9 +2,7 @@
  * RequestParser: validates envelope structure against the project's own JSON
  * Schema (DEC-40), and nothing else.
  *
- * E1 removes the former attached payload entirely. `format` remains
- * structurally a string so `DimensionModelBuilder` owns its semantic meaning
- * until E2 removes that check.
+ * Domain meaning is trusted after this structural boundary.
  *
  * Accepts a raw string, not a pre-parsed object (DT-6's raw-string transport
  * entry). A JSON object with duplicate members — `{"span":{"location":"4",
@@ -108,12 +106,9 @@ export type ParsedRequest =
   | QuerySpanRequest
   | QueryPlanLineRequest;
 
-export class MalformedRequestError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'MalformedRequestError';
-  }
-}
+export type ParseRequestResult =
+  | { readonly ok: true; readonly request: ParsedRequest }
+  | { readonly ok: false; readonly message: string };
 
 /**
  * Parses and structurally validates a raw request body.
@@ -121,23 +116,25 @@ export class MalformedRequestError extends Error {
  * @param raw the request body, as received — a JSON string, not a
  *   pre-parsed object, so that duplicate object members are still visible
  *   (AC-VAL-03; see the class-level comment).
- * @throws MalformedRequestError if `raw` is not valid JSON, contains a
- *   duplicate object member anywhere, or does not conform to the request
- *   schema. An unsupported `format` value remains
- *   `DimensionModelBuilder`'s responsibility through E1.
+ * Returns `ok: false` when `raw` is not valid JSON, contains a duplicate
+ * object member, or does not conform to the structural request schema.
  */
-export function parseRequest(raw: string): ParsedRequest {
+export function parseRequest(raw: string): ParseRequestResult {
+  if (hasDuplicateObjectMembers(raw)) {
+    return { ok: false, message: 'request body contains a duplicate object member' };
+  }
+
   let parsed: unknown;
   try {
-    parsed = parseWithoutDuplicateMembers(raw);
+    parsed = JSON.parse(raw);
   } catch {
-    throw new MalformedRequestError('request body is not valid JSON, or contains a duplicate object member');
+    return { ok: false, message: 'request body is not valid JSON' };
   }
 
   if (!validateRequest(parsed)) {
-    throw new MalformedRequestError(ajv.errorsText(validateRequest.errors, { dataVar: 'request' }));
+    return { ok: false, message: ajv.errorsText(validateRequest.errors, { dataVar: 'request' }) };
   }
-  return parsed as ParsedRequest;
+  return { ok: true, request: parsed as ParsedRequest };
 }
 
 /**
@@ -152,10 +149,10 @@ export function parseRequest(raw: string): ParsedRequest {
  * so a duplicate at one nesting level does not false-positive against an
  * identically named key at another. It is a structural check on the text,
  * not a JSON parser in its own right — `JSON.parse` still does the real
- * parsing, and still throws its own `SyntaxError` for malformed JSON, which
- * this function lets propagate.
+ * parsing. The structural boundary converts malformed JSON into its declared
+ * result in `parseRequest`.
  */
-function parseWithoutDuplicateMembers(raw: string): unknown {
+function hasDuplicateObjectMembers(raw: string): boolean {
   const stack: Set<string>[] = [];
   let inString = false;
   let escaped = false;
@@ -175,7 +172,7 @@ function parseWithoutDuplicateMembers(raw: string): unknown {
           const frame = stack[stack.length - 1];
           if (frame) {
             if (frame.has(key)) {
-              throw new SyntaxError(`duplicate object member: ${key}`);
+              return true;
             }
             frame.add(key);
           }
@@ -209,5 +206,5 @@ function parseWithoutDuplicateMembers(raw: string): unknown {
     // whitespace and all other structural characters are irrelevant here
   }
 
-  return JSON.parse(raw);
+  return false;
 }

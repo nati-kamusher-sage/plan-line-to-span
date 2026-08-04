@@ -12,9 +12,8 @@
  * geometric quantity is computed across `axisCount` axes rather than two, and
  * the split heuristic chooses among n axes rather than between x and y.
  *
- * Axis count may be zero (DT-3). In that case the tree holds at most one entry,
- * because the only expressible span is the empty one, so splitting is
- * unreachable — asserted rather than assumed (DEC-17).
+ * Axis count may be zero (DT-3). Stored-state uniqueness keeps splitting
+ * unreachable for valid input.
  *
  * The tree is generic in its payload type. It never inspects a payload: refs
  * are opaque, which is what keeps geometry out of span identity (DEC-31).
@@ -77,9 +76,6 @@ export class RTree<T> {
    * @param axisCount fixed for the tree's lifetime; zero is valid
    */
   constructor(axisCount: number, { maxEntries = DEFAULT_MAX_ENTRIES }: RTreeOptions = {}) {
-    if (!Number.isInteger(axisCount) || axisCount < 0) {
-      throw new TypeError('axisCount must be a non-negative integer');
-    }
     this.axisCount = axisCount;
     // The reference's default of 9 is retained; minimum fill of 40% is the
     // R*-tree paper's recommendation and the reference's choice.
@@ -100,9 +96,6 @@ export class RTree<T> {
 
   /** Insert a leaf entry. The payload is opaque and never inspected. */
   insert(box: Box, ref: T): this {
-    if (box.length !== this.axisCount) {
-      throw new TypeError(`box has ${box.length} axes, tree has ${this.axisCount}`);
-    }
     this._insert({ box: cloneBox(box), ref }, this.data.height - 1);
     this._size++;
     return this;
@@ -256,15 +249,6 @@ export class RTree<T> {
     const node = insertPath[level]!;
     const M = node.children.length;
     const m = this._minEntries;
-
-    // DEC-17: with zero axes the only expressible span is the empty one, so at
-    // most one entry can exist and this path is unreachable. Fail loudly rather
-    // than letting the split heuristic read an axis that does not exist.
-    if (this.axisCount === 0) {
-      throw new Error(
-        'invariant violated: a zero-dimensional index cannot hold enough entries to split; ' +
-        'at most one span is expressible when no dimensions are defined');
-    }
 
     this._chooseSplitAxis(node, m, M);
     const splitIndex = this._chooseSplitIndex(node, m, M);
