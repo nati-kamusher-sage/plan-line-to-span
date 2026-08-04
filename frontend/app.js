@@ -3,7 +3,7 @@
 // This file's only job is to build request envelopes exactly as the
 // interface contract defines them, POST the raw JSON to /api/dispatch, and
 // display the response envelope unmodified. It performs no client-side
-// validation, matching, or interpretation of formulas -- the contract
+// validation or matching -- the contract
 // surface owns all of that (DEC-2: the UI must add no behavior the contract
 // does not define). Any error the utility returns is shown exactly as
 // received, `ok: false` and all.
@@ -62,18 +62,18 @@ document.getElementById('init-submit').addEventListener('click', () => {
   });
 });
 
-document.getElementById('benefit-submit').addEventListener('click', () => {
-  const operation = document.getElementById('benefit-operation').value;
-  const span = parseJsonField(document.getElementById('benefit-span'));
+document.getElementById('span-submit').addEventListener('click', () => {
+  const operation = document.getElementById('span-operation').value;
+  const span = parseJsonField(document.getElementById('span-span'));
 
-  const payload = operation === 'deleteBenefit' || operation === 'queryBenefit'
-    ? { span }
-    : { span, formula: parseJsonField(document.getElementById('benefit-formula')) };
+  const payload = operation === 'updateSpan'
+    ? { span, replacementSpan: parseJsonField(document.getElementById('replacement-span')) }
+    : { span };
 
   send({ contractVersion: CONTRACT_VERSION, operation, payload });
 });
 
-document.getElementById('employee-submit').addEventListener('click', () => {
-  const dimensions = parseJsonField(document.getElementById('employee-dimensions'));
-  send({ contractVersion: CONTRACT_VERSION, operation: 'queryEmployee', payload: { dimensions } });
+document.getElementById('plan-line-submit').addEventListener('click', () => {
+  const dimensions = parseJsonField(document.getElementById('plan-line-dimensions'));
+  send({ contractVersion: CONTRACT_VERSION, operation: 'queryPlanLine', payload: { dimensions } });
 });

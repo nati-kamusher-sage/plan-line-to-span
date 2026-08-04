@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import { buildLogRecord, type LogRecordInput } from '../../src/observability/log-record.ts';
 
 const BASE: LogRecordInput = {
-  sequence: 1, operation: 'createBenefit', outcome: 'success',
-  durationMs: 0.4, state: 'ready', benefitCount: 3,
+  sequence: 1, operation: 'createSpan', outcome: 'success',
+  durationMs: 0.4, state: 'ready', spanCount: 3,
 };
 
 test('a well-formed record is accepted', () => {
@@ -24,8 +24,8 @@ test('an extra span-shaped field is ignored, not carried (structurally impossibl
   assert.ok(!('span' in record));
 });
 
-test('payload data in a known field is rejected: formula smuggled as benefitCount', () => {
-  const smuggled = { ...BASE, benefitCount: { f: 'SEKRIT' } } as unknown as LogRecordInput;
+test('payload data in a known field is rejected when smuggled as spanCount', () => {
+  const smuggled = { ...BASE, spanCount: { f: 'SEKRIT' } } as unknown as LogRecordInput;
   assert.throws(() => buildLogRecord(smuggled), TypeError);
 });
 
@@ -45,12 +45,12 @@ test('a sentinel as state is rejected', () => {
 });
 
 test('a dimension value smuggled as matchCount (wrong type) is rejected', () => {
-  const smuggled = { ...BASE, operation: 'queryEmployee' as const, matchCount: '20' } as unknown as LogRecordInput;
+  const smuggled = { ...BASE, operation: 'queryPlanLine' as const, matchCount: '20' } as unknown as LogRecordInput;
   assert.throws(() => buildLogRecord(smuggled), TypeError);
 });
 
-test('a negative benefitCount is rejected', () => {
-  assert.throws(() => buildLogRecord({ ...BASE, benefitCount: -1 }), TypeError);
+test('a negative spanCount is rejected', () => {
+  assert.throws(() => buildLogRecord({ ...BASE, spanCount: -1 }), TypeError);
 });
 
 test('a negative durationMs is rejected', () => {
@@ -64,7 +64,7 @@ test('null instead of omitted is rejected for an optional field', () => {
 
 test('the sentinel never reaches the output even when passed as an unrecognized field', () => {
   const SENTINEL = 'SEKRIT-PLANNING-DATA';
-  const withSmuggled = { ...BASE, span: { location: SENTINEL }, formula: { secret: SENTINEL } } as LogRecordInput;
+  const withSmuggled = { ...BASE, span: { location: SENTINEL }, planLine: { secret: SENTINEL } } as LogRecordInput;
   const record = buildLogRecord(withSmuggled);
   const line = JSON.stringify(record);
   assert.ok(!line.includes(SENTINEL), 'AC-OBS-04: sentinel must be absent from the record');
@@ -74,7 +74,7 @@ test('only contract-defined fields are present (Obs 3)', () => {
   const record = buildLogRecord(BASE);
   const allowed = new Set([
     'timestamp', 'event', 'sequence', 'level', 'operation', 'outcome',
-    'durationMs', 'state', 'benefitCount', 'errorCode', 'matchCount',
+    'durationMs', 'state', 'spanCount', 'errorCode', 'matchCount',
     'dimensionCount', 'dimensionValueCount',
   ]);
   const extra = Object.keys(record).filter(k => !allowed.has(k));

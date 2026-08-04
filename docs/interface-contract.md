@@ -4,9 +4,9 @@
 |---|---|
 | Contract name | `plan-line-to-span` |
 | Contract version | `v1` |
-| Status | ECP-1 target contract; executable schema follows in E1 |
+| Status | ECP-1 target contract; spans-only executable surface implemented in E1 |
 | Governing behavior | [Operational Concept](operational-concept.md) |
-| Executable schema | [plan-line-to-span-v1.schema.json](schemas/plan-line-to-span-v1.schema.json) (Phase 1 shape until E1) |
+| Executable schema | [plan-line-to-span-v1.schema.json](schemas/plan-line-to-span-v1.schema.json) |
 
 ## 1. Purpose and conformance
 
@@ -14,10 +14,9 @@ This contract defines the transport-neutral JSON messages exchanged with the uti
 The operational concept governs behavior; this document supplies exact request,
 response, and state-outcome shapes.
 
-ECP-1 revises the unreleased draft `v1` contract in place. During the E0 documentation
-stage, this prose is the target authority and the runtime schema intentionally remains at
-the Phase 1 shape so the existing implementation stays regression-green. E1 updates the
-schema and implementation together.
+ECP-1 revises the unreleased draft `v1` contract in place. E1 updates the schema and
+implementation atomically to the spans-only operation and payload vocabulary. E2 applies
+the optimistic-execution portion of this target contract.
 
 ## 2. Common request envelope
 
@@ -229,8 +228,8 @@ ECP-1 removes semantic validation and exception translation. In particular, the 
 contract has no dedicated codes for invalid dimension definitions, unknown dimensions,
 unknown values, payload content outside the concept model, or index exceptions.
 
-The executable schema remains at its Phase 1 shape during E0 because it is compiled by
-the current runtime. E1 changes it atomically with the parser, dispatcher, and tests.
+The executable schema and parser use the spans-only operation and payload shapes. E2
+removes the semantic checks and exception translation that remain during E1 sequencing.
 
 ## 8. Compatibility
 

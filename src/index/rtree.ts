@@ -17,7 +17,7 @@
  * unreachable — asserted rather than assumed (DEC-17).
  *
  * The tree is generic in its payload type. It never inspects a payload: refs
- * are opaque, which is what keeps geometry out of benefit identity (DEC-31).
+ * are opaque, which is what keeps geometry out of span identity (DEC-31).
  */
 
 import {
@@ -113,7 +113,7 @@ export class RTree<T> {
    *
    * The reference narrows the descent using the entry's bounding box. Here the
    * caller identifies the entry by predicate rather than by box, so the search
-   * is an ordinary depth-first walk. `BenefitStore` removes by canonical span
+   * is an ordinary depth-first walk. `SpanStore` removes by canonical span
    * key (DEC-24, DEC-31), and identity deliberately never depends on geometry.
    *
    * @returns whether an entry was removed
@@ -263,7 +263,7 @@ export class RTree<T> {
     if (this.axisCount === 0) {
       throw new Error(
         'invariant violated: a zero-dimensional index cannot hold enough entries to split; ' +
-        'at most one benefit is expressible when no dimensions are defined');
+        'at most one span is expressible when no dimensions are defined');
     }
 
     this._chooseSplitAxis(node, m, M);

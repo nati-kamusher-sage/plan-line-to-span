@@ -2,14 +2,9 @@
  * RequestParser: validates envelope structure against the project's own JSON
  * Schema (DEC-40), and nothing else.
  *
- * DEC-28 and DEC-42 require this component to never judge `formula` or
- * `format` — the schema deliberately leaves both structurally unconstrained
- * (see docs/schemas/plan-line-to-span-v1.schema.json's `$comment`s) so that
- * `INVALID_FORMULA` and `INVALID_DIMENSION_DEFINITION` reach their semantic
- * owners (`FormulaValidator`, `DimensionModelBuilder`) instead of being
- * pre-empted here as `MALFORMED_REQUEST`. This is what prevents the
- * regression the WP-7 readiness review recorded as ISSUE-03: fixing it
- * structurally, not by remembering an ordering convention.
+ * E1 removes the former attached payload entirely. `format` remains
+ * structurally a string so `DimensionModelBuilder` owns its semantic meaning
+ * until E2 removes that check.
  *
  * Accepts a raw string, not a pre-parsed object (DT-6's raw-string transport
  * entry). A JSON object with duplicate members — `{"span":{"location":"4",
@@ -61,31 +56,34 @@ export interface InitializeRequest extends RequestEnvelope {
   };
 }
 
-interface BenefitPayload { readonly span: DimensionMap; readonly formula: unknown }
 interface SpanPayload { readonly span: DimensionMap }
-
-export interface CreateBenefitRequest extends RequestEnvelope {
-  readonly operation: 'createBenefit';
-  readonly payload: BenefitPayload;
+interface UpdateSpanPayload {
+  readonly span: DimensionMap;
+  readonly replacementSpan: DimensionMap;
 }
 
-export interface UpdateBenefitRequest extends RequestEnvelope {
-  readonly operation: 'updateBenefit';
-  readonly payload: BenefitPayload;
-}
-
-export interface DeleteBenefitRequest extends RequestEnvelope {
-  readonly operation: 'deleteBenefit';
+export interface CreateSpanRequest extends RequestEnvelope {
+  readonly operation: 'createSpan';
   readonly payload: SpanPayload;
 }
 
-export interface QueryBenefitRequest extends RequestEnvelope {
-  readonly operation: 'queryBenefit';
+export interface UpdateSpanRequest extends RequestEnvelope {
+  readonly operation: 'updateSpan';
+  readonly payload: UpdateSpanPayload;
+}
+
+export interface DeleteSpanRequest extends RequestEnvelope {
+  readonly operation: 'deleteSpan';
   readonly payload: SpanPayload;
 }
 
-export interface QueryEmployeeRequest extends RequestEnvelope {
-  readonly operation: 'queryEmployee';
+export interface QuerySpanRequest extends RequestEnvelope {
+  readonly operation: 'querySpan';
+  readonly payload: SpanPayload;
+}
+
+export interface QueryPlanLineRequest extends RequestEnvelope {
+  readonly operation: 'queryPlanLine';
   readonly payload: { readonly dimensions: DimensionMap };
 }
 
@@ -104,11 +102,11 @@ export interface QueryEmployeeRequest extends RequestEnvelope {
  */
 export type ParsedRequest =
   | InitializeRequest
-  | CreateBenefitRequest
-  | UpdateBenefitRequest
-  | DeleteBenefitRequest
-  | QueryBenefitRequest
-  | QueryEmployeeRequest;
+  | CreateSpanRequest
+  | UpdateSpanRequest
+  | DeleteSpanRequest
+  | QuerySpanRequest
+  | QueryPlanLineRequest;
 
 export class MalformedRequestError extends Error {
   constructor(message: string) {
@@ -125,9 +123,8 @@ export class MalformedRequestError extends Error {
  *   (AC-VAL-03; see the class-level comment).
  * @throws MalformedRequestError if `raw` is not valid JSON, contains a
  *   duplicate object member anywhere, or does not conform to the request
- *   schema. Never thrown for a null/non-object `formula` or an unsupported
- *   `format` value — those are `FormulaValidator`'s and
- *   `DimensionModelBuilder`'s responsibility (DEC-28, DEC-42).
+ *   schema. An unsupported `format` value remains
+ *   `DimensionModelBuilder`'s responsibility through E1.
  */
 export function parseRequest(raw: string): ParsedRequest {
   let parsed: unknown;

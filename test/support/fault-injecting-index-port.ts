@@ -13,14 +13,14 @@
  * code aware of testing").
  *
  * `failAfter` (default 0) lets a test establish prior state through the
- * *same* wrapped port before the fault fires: AC-INIT-09 requires a benefit
+ * *same* wrapped port before the fault fires: AC-INIT-09 requires a span
  * to already exist and remain queryable after a *later* create fails, so the
  * fault cannot simply fire on every call to the nominated operation --
  * nothing could ever have been created to fail alongside.
  */
 
 import type { CanonicalSpan } from '../../src/model/span.ts';
-import { IndexFailureError, type IndexPort, type IndexedBenefit } from '../../src/store/index-adapter.ts';
+import { IndexFailureError, type IndexPort } from '../../src/store/index-adapter.ts';
 
 export type InjectableOperation = 'insert' | 'remove' | 'findExact' | 'searchMatching' | 'all';
 
@@ -46,9 +46,9 @@ export class FaultInjectingIndexPort implements IndexPort {
     return this.real.size;
   }
 
-  insert(span: CanonicalSpan, formula: unknown): void {
+  insert(span: CanonicalSpan): void {
     this.failIfNominated('insert');
-    this.real.insert(span, formula);
+    this.real.insert(span);
   }
 
   remove(span: CanonicalSpan): boolean {
@@ -56,17 +56,17 @@ export class FaultInjectingIndexPort implements IndexPort {
     return this.real.remove(span);
   }
 
-  findExact(span: CanonicalSpan): IndexedBenefit | undefined {
+  findExact(span: CanonicalSpan): CanonicalSpan | undefined {
     this.failIfNominated('findExact');
     return this.real.findExact(span);
   }
 
-  searchMatching(planLine: Readonly<Record<string, string>>): IndexedBenefit[] {
+  searchMatching(planLine: Readonly<Record<string, string>>): CanonicalSpan[] {
     this.failIfNominated('searchMatching');
     return this.real.searchMatching(planLine);
   }
 
-  all(): IndexedBenefit[] {
+  all(): CanonicalSpan[] {
     this.failIfNominated('all');
     return this.real.all();
   }

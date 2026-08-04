@@ -12,7 +12,7 @@
 export type State = 'uninitialized' | 'initializing' | 'ready' | 'failed';
 
 export const OPERATIONS = [
-  'initialize', 'createBenefit', 'updateBenefit', 'deleteBenefit', 'queryBenefit', 'queryEmployee',
+  'initialize', 'createSpan', 'updateSpan', 'deleteSpan', 'querySpan', 'queryPlanLine',
 ] as const;
 export type Operation = (typeof OPERATIONS)[number];
 

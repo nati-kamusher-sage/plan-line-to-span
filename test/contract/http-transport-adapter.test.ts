@@ -46,7 +46,7 @@ test('POST /api/dispatch forwards the raw body and returns the Response envelope
 
     const body = await res.json();
     assert.equal(body.ok, true);
-    assert.deepEqual(body.data, { state: 'ready', dimensionCount: 2, benefitCount: 0 });
+    assert.deepEqual(body.data, { state: 'ready', dimensionCount: 2, spanCount: 0 });
   });
 });
 
@@ -78,16 +78,16 @@ test('a full create-then-query round trip works over the real HTTP transport', a
 
     await dispatch({ contractVersion: V, operation: 'initialize', payload: D1_FILE });
     const createRes = await dispatch({
-      contractVersion: V, operation: 'createBenefit',
-      payload: { span: { location: '4' }, formula: { rate: 0.1 } },
+      contractVersion: V, operation: 'createSpan',
+      payload: { span: { location: '4' } },
     });
     assert.equal(createRes.ok, true);
 
     const queryRes = await dispatch({
-      contractVersion: V, operation: 'queryBenefit', payload: { span: { location: '4' } },
+      contractVersion: V, operation: 'querySpan', payload: { span: { location: '4' } },
     });
     assert.equal(queryRes.ok, true);
-    assert.deepEqual(queryRes.data, { benefit: { span: { location: '4' }, formula: { rate: 0.1 } } });
+    assert.deepEqual(queryRes.data, { span: { location: '4' } });
   });
 });
 

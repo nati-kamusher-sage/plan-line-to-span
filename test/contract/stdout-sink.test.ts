@@ -40,7 +40,7 @@ test('ObservabilityEmitter with the default sink writes one JSON Lines record pe
     const emitter = new ObservabilityEmitter(new OperationDispatcher());
     emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE }));
     emitter.dispatch(JSON.stringify({
-      contractVersion: V, operation: 'createBenefit', payload: { span: { location: '4' }, formula: { r: 1 } },
+      contractVersion: V, operation: 'createSpan', payload: { span: { location: '4' } },
     }));
   });
 

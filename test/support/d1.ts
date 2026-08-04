@@ -16,8 +16,9 @@
 
 import { buildDimensionModel, DIMENSION_FILE_FORMAT, type DimensionFile } from '../../src/model/dimension-model.ts';
 import { RTree } from '../../src/index/rtree.ts';
-import { IndexAdapter, type IndexedBenefit } from '../../src/store/index-adapter.ts';
-import { BenefitStore } from '../../src/store/benefit-store.ts';
+import { IndexAdapter } from '../../src/store/index-adapter.ts';
+import { SpanStore } from '../../src/store/span-store.ts';
+import type { CanonicalSpan } from '../../src/model/span.ts';
 
 export const D1_FILE: DimensionFile = {
   format: DIMENSION_FILE_FORMAT,
@@ -46,10 +47,10 @@ export function buildD1(): ReturnType<typeof buildDimensionModel> {
   return buildDimensionModel(D1_FILE);
 }
 
-/** A fresh, empty benefit store wired over a fresh index, for the given model. */
-export function buildBenefitStore(
+/** A fresh, empty span store wired over a fresh index, for the given model. */
+export function buildSpanStore(
   model: ReturnType<typeof buildDimensionModel>,
-): BenefitStore {
-  const index = new IndexAdapter(new RTree<IndexedBenefit>(model.axisCount), model);
-  return new BenefitStore(index);
+): SpanStore {
+  const index = new IndexAdapter(new RTree<CanonicalSpan>(model.axisCount), model);
+  return new SpanStore(index);
 }

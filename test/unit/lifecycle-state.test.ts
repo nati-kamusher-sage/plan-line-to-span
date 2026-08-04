@@ -106,20 +106,20 @@ test('AC-INIT-04/05: reinitialization tracks priorState so failure returns to re
   assert.equal(lc.state, 'ready', 'failed reinitialization returns to ready, not failed');
 });
 
-test('AC-INIT-06/07/08: canAccept rejects benefit operations outside ready', () => {
+test('AC-INIT-06/07/08: canAccept rejects span operations outside ready', () => {
   const lc = new LifecycleState();
-  for (const op of ['createBenefit', 'updateBenefit', 'deleteBenefit', 'queryBenefit', 'queryEmployee'] as const) {
+  for (const op of ['createSpan', 'updateSpan', 'deleteSpan', 'querySpan', 'queryPlanLine'] as const) {
     assert.equal(lc.canAccept(op), false, `uninitialized should reject ${op}`);
   }
 
   lc.beginInitializing();
-  for (const op of ['createBenefit', 'queryEmployee', 'initialize'] as const) {
+  for (const op of ['createSpan', 'queryPlanLine', 'initialize'] as const) {
     assert.equal(lc.canAccept(op), false, `initializing should reject ${op}`);
   }
 
   lc.completeInitialization('uninitialized', 'failure');
   assert.equal(lc.state, 'failed');
-  for (const op of ['createBenefit', 'queryBenefit', 'queryEmployee'] as const) {
+  for (const op of ['createSpan', 'querySpan', 'queryPlanLine'] as const) {
     assert.equal(lc.canAccept(op), false, `failed should reject ${op}`);
   }
   assert.equal(lc.canAccept('initialize'), true, 'failed accepts a retry');
@@ -150,13 +150,13 @@ test('all four states are reachable', () => {
   assert.deepEqual(seen, new Set<State>(['uninitialized', 'ready', 'failed']));
 });
 
-test('ready is stable under every benefit operation outcome, including index failure', () => {
+test('ready is stable under every span operation outcome, including index failure', () => {
   const lc = new LifecycleState();
   lc.completeInitialization(lc.beginInitializing(), 'success');
   assert.equal(lc.state, 'ready');
-  // Benefit operations never call beginInitializing/completeInitialization at
+  // Span operations never call beginInitializing/completeInitialization at
   // all -- there is no transition path for them to take the state anywhere.
   // This test documents that absence as the mechanism, not a call to assert.
-  assert.equal(lc.canAccept('createBenefit'), true);
+  assert.equal(lc.canAccept('createSpan'), true);
   assert.equal(lc.state, 'ready', 'canAccept does not itself change state');
 });

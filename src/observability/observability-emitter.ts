@@ -75,9 +75,9 @@ export class ObservabilityEmitter {
         outcome: response.ok ? 'success' : 'failure',
         durationMs,
         state: this.dispatcher.state as LogState,
-        benefitCount: this.dispatcher.benefitCount,
+        spanCount: this.dispatcher.spanCount,
         ...(response.ok ? {} : { errorCode: response.error.code as LogErrorCode }),
-        ...(response.ok && response.operation === 'queryEmployee'
+        ...(response.ok && response.operation === 'queryPlanLine'
           ? { matchCount: (response.data['matches'] as readonly unknown[]).length }
           : {}),
         ...(response.ok && response.operation === 'initialize'
