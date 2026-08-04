@@ -37,3 +37,8 @@ The three implementation-blocking questions are settled:
 
 These rulings are authoritative for the implementation plan and the E0 specification
 update.
+
+E0 also resolves two consequences while applying those rulings: `INVALID_STATE` and the
+structural `MALFORMED_REQUEST` boundary remain; the unreleased draft contract is revised
+in place as `plan-line-to-span/v1`. The acceptance catalogue retains all 48 historical
+case lineages as 39 active cases and 9 explicitly retired cases.

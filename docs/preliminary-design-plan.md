@@ -2,12 +2,18 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | Draft; awaiting owner approval |
+| Status | Historical Phase 1 plan; superseded by ECP-1 |
 | Purpose | Define the work needed to produce a preliminary technical design for the Plan Line to Span demo |
 | Scope | Plan Line to Span demo |
 | Governing input | [Operational Concept](operational-concept.md) and the approved requirements baseline |
 | Predecessor | [Requirements Readiness Completion Plan](requirements-readiness-completion-plan.md), completed |
 | Successor | Detailed design and implementation |
+
+> **ECP-1 note:** This plan records the Phase 1 design process and retains its original
+> terminology as historical evidence. Current behavior and revised design decisions are
+> governed by [ECP-1](ECP/ECP-1/ECP-1.md), its
+> [implementation plan](ECP/ECP-1/ECP-1-implementation-plan.md), and the ECP-1-revised
+> DT-1 through DT-10 records.
 
 ## 1. Objective
 

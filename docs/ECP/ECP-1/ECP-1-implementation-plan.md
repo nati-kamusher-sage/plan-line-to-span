@@ -2,7 +2,7 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | Ready for E0; rulings settled 2026-08-04, implementation not started |
+| Status | E0 implemented on `ecp-1-e0-specification`; review and merge pending |
 | Purpose | Apply the two ECP-1 architectural changes to the engineering specification and the code |
 | Governing input | [ECP-1](ECP-1.md), as clarified 2026-08-04 |
 | Predecessor | [Implementation Execution Plan](../../implementation-plan.md), Phase 1 complete (T1–T13, T8 skipped) |
@@ -92,7 +92,7 @@ broad landing at the same time as EC-2's deletions would make review impossible.
 
 ## 3. What EC-2 means, precisely
 
-Taken to its limit, EC-2 deletes the error half of the interface contract: eleven error
+Taken to its limit, EC-2 deletes the error half of the interface contract: nine error
 codes (`src/dispatch/response.ts:17`), the error envelope (IC 6), and roughly twenty
 acceptance cases that assert specific codes.
 
@@ -101,7 +101,7 @@ traceability:
 
 | Reading | What it means | Effect |
 |---|---|---|
-| **E1 (selected)** | Remove *defensive* checks on data the utility can assume well-formed: internal invariant assertions, re-validation of already-validated values, and the try/catch layers translating them. Keep the declared responses that are genuine contract behavior — `DUPLICATE_SPAN`, `NOT_FOUND`, `INVALID_STATE`. | Contract preserved. Structural-rejection cases dropped; `AC-SPAN-*` and `AC-INIT-*` survive. |
+| **E1 (selected)** | Keep the structural request boundary needed to select a typed operation. Remove semantic checks, internal invariant assertions, re-validation of program-produced values, and catch/translate layers. Keep genuine state behavior — `DUPLICATE_SPAN`, `NOT_FOUND`, `INVALID_STATE`. | Four declared codes remain including `MALFORMED_REQUEST`; 39 cases are active and 9 are retired. |
 | E2 | Remove all validation and exception handling, including duplicate and not-found detection. Errors become crashes. | IC 6 collapses. `querySpan` on a missing span returns undefined or throws uncaught; create-over-existing silently corrupts. ~20 cases retired. |
 
 **E0 ruling: use E1.** `DUPLICATE_SPAN` and `NOT_FOUND` are not validation of input
@@ -148,7 +148,7 @@ Answering ECP-1 question 2.
 | `src/index/rtree.ts` | The `TypeError` guards on axis count and box arity (lines 81, 104) and the DEC-17 split assertion (line 264) are internal invariant checks on data the utility controls. Removed. |
 | `src/observability/log-record.ts` | Field validators (lines 68, 75, 101) validate values the emitter itself constructs. Removed. |
 | `src/transport/request-parser.ts` | Under E1 the schema check stays — it is the trust boundary, the one place data genuinely arrives untrusted. Under E2 it goes, and `ajv` leaves the dependency list. |
-| `src/observability/observability-emitter.ts` | The emission try/catch (line 71) is deliberate isolation: observability must not break dispatch. Recommend keeping, recorded as an explicit exception to EC-2. |
+| `src/observability/observability-emitter.ts` | The emission try/catch (line 71) is removed. A sink failure may propagate after domain work completes; the target contract no longer promises isolation. |
 
 ### 4.3 Resolved optimistic boundary
 
@@ -168,14 +168,19 @@ Answering ECP-1 question 1.
 |---|---|---|
 | `docs/operational-concept.md` | The deepest edit. **OC 6.5 (Formula) and 6.6 (Benefit) are deleted outright**; 6.4's "global benefit" becomes "global span". OC 1 and 3 restate the purpose as span matching, not benefit lookup. OC 9 matching semantics keeps its rules and drops formula from every result description. OC 10–12 operation tables and workflows renamed. OC 13 data contracts. OC 14 rewritten around the optimistic posture. OC 15 states the performance-over-correctness trade. OC 16 records EC-1 and EC-2. OC 18 glossary loses three terms and gains *plan line*. | EC-1, EC-2 |
 | `docs/interface-contract.md` | **IC 3.2 (Formula) deleted.** IC 4 operations renamed with examples rewritten; `updateSpan` documents `{ span, replacementSpan }` plus its `NOT_FOUND` and `DUPLICATE_SPAN` outcomes. IC 5 success-response table loses the `benefit` wrapper. IC 6 error codes reduce to the E1-surviving set. IC 6.1 state table keeps its shape with renamed operations. IC 7 states that only envelope structure is checked. IC 8 compatibility: this is a breaking change to `plan-line-to-span/v1`. | EC-1, EC-2 |
-| `docs/schemas/plan-line-to-span-v1.schema.json` | Listed under code (4.1) since it is compiled at runtime, but it is equally the contract's structural authority. | EC-1 |
-| `docs/acceptance-cases.md` | `AC-BEN-*` → `AC-SPAN-*`, keeping numbering. `AC-BEN-11` and `AC-VAL-07` marked retired with reason. `AC-MATCH-*` and `AC-OBS-04` drop formula from expectations. Retired rows are marked, not deleted, so the catalogue stays auditable. | EC-1, EC-2 |
+| `docs/schemas/plan-line-to-span-v1.schema.json` | Deferred to E1 because it is executable and compiled by the Phase 1 runtime. E1 changes schema, parser, dispatcher, and tests atomically. | EC-1 |
+| `docs/acceptance-cases.md` | `AC-BEN-01` through `-10` → `AC-SPAN-*`; 39 active cases are reshaped and 9 retired identifiers remain with reasons. | EC-1, EC-2 |
+| `docs/design/dt-1-architectural-context.md` | Retains runtime/topology; removes the semantic validation chain and revises result/exception principles. | EC-1, EC-2 |
+| `docs/design/dt-2a-index-library-evaluation.md` | Keeps the direct-index decision; updates stored-count and query vocabulary. | EC-1 |
 | `docs/design/dt-4-component-structure.md` | Section 3 responsibilities and section 4 error-code ownership; `BenefitStore` → `SpanStore` throughout. Amend DEC-31. | EC-1 |
 | `docs/design/dt-6-validation-and-errors.md` | Most affected design record. Its pipeline, precedence argument, and DEC-40 to DEC-44 are largely superseded — DEC-42 (the schema not constraining `formula`) becomes vacuous. Rewrite as the optimistic-execution record rather than deleting, so the history of why validation existed survives. | EC-2 |
 | `docs/design/dt-2-dimension-to-axis-mapping.md` | DEC-24 (identity by canonical key) is simplified, not changed: the canonical key is now the whole stored object. | EC-1 |
 | `docs/design/dt-3-empty-span-representation.md` | "Global benefit" → "global span" throughout; the representation decisions themselves stand. | EC-1 |
+| `docs/design/dt-5-lifecycle.md` | Retains state gating; removes invalid-input failure guarantees and rewrites mutation isolation for span replacement. | EC-1, EC-2 |
 | `docs/design/dt-9-test-approach.md` | Records the validation-pipeline promotion as retired by ECP-1. | EC-2 |
 | `docs/design/dt-7-performance-evaluation.md` | Method unchanged. Note that T12's numbers were measured with formula-carrying entries, so the re-run is a comparison point, not a new threshold. | EC-1 |
+| `docs/design/dt-8-observability.md` | Renames fields/operations and removes sink-failure isolation and defensive record validation. | EC-1, EC-2 |
+| `docs/design/dt-10-design-review.md` | Re-reviews cross-record consistency and records 39 active/9 retired cases. | EC-1, EC-2 |
 | `docs/observability-contract.md` | Check and likely light edit: it forbids formula in log records, and that prohibition becomes vacuous. Obs 3/4 `benefitCount` field renamed. | EC-1 |
 | `docs/implementation-plan.md` | Closing note that Phase 1 is superseded in these respects, pointing here. T8 formally retired. | EC-1, EC-2 |
 
@@ -185,7 +190,7 @@ Answering ECP-1 question 3. Each task is one session, one branch, and one pull r
 following the Phase 1 workflow in `docs/implementation-plan.md` section 3.1.
 
 ```
-E0  rulings + specification update      docs only
+E0  rulings + specification update      docs + transition assertion
 E1  spans only, and the rename          EC-1
 E2  optimistic execution                EC-2
 E3  re-measure and reconcile            evidence
@@ -221,12 +226,16 @@ The three rulings were settled on 2026-08-04: update becomes span replacement, a
 remaining benefit operation/count names become span names, and the E1 reading of
 optimistic execution retains `DUPLICATE_SPAN` and `NOT_FOUND`.
 
-Then apply every documentation change in section 5 in one pass, so the specification is
-coherent before code moves against it.
+Then apply every prose-document change in section 5 in one pass, so the specification is
+coherent before code moves against it. The executable JSON Schema is deliberately part of
+E1 rather than E0 because changing it alone would break the Phase 1 runtime. E0 makes the
+interface-example unit test transition-aware: it checks target JSON and operation shapes
+without asking the old parser to accept them. E1 restores parser/schema validation after
+both move together.
 
-**Done when:** the settled rulings are reflected consistently, every document in section
-5 is updated, the retired cases are marked with reasons, and the surviving case count is
-stated explicitly.
+**Done when:** the settled rulings are reflected consistently, every prose document in
+section 5 is updated, the schema deferral is explicit, all 9 retired cases have reasons,
+and the 39-case active count is stated explicitly.
 
 ### E1 — spans only, and the rename
 
@@ -240,8 +249,8 @@ larger total diff than doing both at once.
 
 **Done when:** no occurrence of formula, benefit, or employee remains in `src/`, `test/`,
 `frontend/`, or the schema; `updateSpan` replaces the source span with the requested
-replacement; the suite passes; and the surviving matching cases assert the same span sets
-as before.
+replacement; the interface examples again validate through the real parser/schema; the
+suite passes; and the surviving matching cases assert the same span sets as before.
 
 ### E2 — optimistic execution
 
@@ -265,11 +274,12 @@ It does not restore T8. EC-1 removes `INVALID_FORMULA` and EC-2 makes the skippe
 validation pipeline permanent.
 
 It does not re-open the index algorithm. EC-1 changes what the tree stores, not how it
-splits or searches; DEC-17 and the DT-2a parameters stand.
+splits or searches. DT-2a parameters stand; only DEC-17's defensive zero-axis assertion
+is superseded by optimistic execution.
 
-It does not preserve `plan-line-to-span/v1` compatibility. The contract changes
-incompatibly — operations renamed, payloads reshaped. Whether that warrants a `/v2`
-version string is an E0 question.
+It does not preserve Phase 1 draft compatibility. The contract changes incompatibly —
+operations renamed and payloads reshaped — but E0 rules that the unreleased draft is
+revised in place as `plan-line-to-span/v1` rather than introducing `/v2`.
 
 It gives no effort estimates, for the same reason Phase 1 gave none.
 
@@ -279,6 +289,6 @@ It gives no effort estimates, for the same reason Phase 1 gave none.
 |---|---|---|
 | ER-1 | EC-2 removes the checks that make defects loud, so a defect introduced by EC-1's rename surfaces as wrong output rather than an error. | E1 lands before E2, while the checks still exist. |
 | ER-2 | A rename across ~500 code sites and ~850 document mentions silently changes behavior somewhere — a renamed field that no longer matches a schema key, or a test fixture whose meaning shifts. | The suite is the gate; E1's done-condition requires the surviving matching cases to assert the same span sets as before, which a rename must not alter. |
-| ER-3 | Cycle-detection removal turns a malformed dimension definition into a hang rather than an error. | Called out at 4.2 for explicit acceptance. A hang is worse than a crash for a demo; the architect may want this one exception. |
+| ER-3 | Cycle-detection removal turns a malformed dimension definition into a hang rather than an error. | Explicitly accepted in E0 as caller-owned under optimistic execution; E2 removes the guard and records the consequence. |
 | ER-4 | The regression suite shrinks, so it detects less. | Every retired test is named in its PR with its case id, so the loss is visible rather than inferred from a falling count. |
-| ER-5 | The demo's stated purpose in OC 1 is benefit lookup; after EC-1 it matches spans and returns nothing else. If a downstream consumer was assumed, that assumption is now unmet. | Raised at E0. This is a product question, not an engineering one — the plan implements it as directed, but does not decide it. |
+| ER-5 | A downstream consumer may have assumed the Phase 1 result payload. | E0 resolves the product surface as span matching only and marks Phase 1 compatibility intentionally unsupported. |

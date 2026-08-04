@@ -2,13 +2,17 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | Draft |
+| Status | Historical Phase 1 review; superseded by ECP-1 |
 | Purpose | Record the WP-7 readiness and consistency review of the active governing documents |
 | Review date | 2026-07-31 |
 | Revision | Second pass, re-run after the first pass's issues were resolved |
 | Reviewer role | Independent review |
 | Governing input | [Operational Concept](operational-concept.md) |
 | Documents reviewed | [Operational Concept](operational-concept.md), [Interface Contract](interface-contract.md), [JSON Schema](schemas/plan-line-to-span-v1.schema.json), [Observability Contract](observability-contract.md), [Acceptance Cases](acceptance-cases.md) |
+
+> **ECP-1 note:** The findings below describe the Phase 1 documents as they existed on
+> 2026-07-31. They are retained as review evidence, not as a review of the ECP-1 target.
+> The revised cross-record review is [DT-10](design/dt-10-design-review.md).
 
 ## 1. Method
 

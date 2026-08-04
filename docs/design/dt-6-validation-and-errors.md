@@ -1,122 +1,132 @@
-# DT-6: Validation and Error Handling
+# DT-6: Optimistic Execution and State Outcomes
 
 | Document attribute | Value |
 |---|---|
-| Status | Draft; awaiting technical-lead approval |
-| Design task | DT-6 of the [Preliminary Design Execution Plan](../preliminary-design-plan.md) |
-| Governing input | [Interface Contract](../interface-contract.md) 6, 6.1, 7; [Operational Concept](../operational-concept.md) 14 |
+| Status | Rewritten by ECP-1 |
+| Governing input | [ECP-1](../ECP/ECP-1/ECP-1.md), [Interface Contract](../interface-contract.md) 6–7 |
 | Depends on | [DT-4](dt-4-component-structure.md), [DT-5](dt-5-lifecycle.md) |
-| Prototype | [validation pipeline](prototypes/dt-6-validation-pipeline.mjs) |
 
 ## 1. Decision
 
-Four ordered validation stages, each owning its codes from DT-4, with structural validation driven by the project's own JSON Schema rather than hand-written checks.
+Assume domain data is correct and valid. Remove semantic validation, internal invariant
+guards, and catch/translate layers. Retain only the structural request boundary and the
+declared outcomes that answer questions about lifecycle or stored state.
 
-The stage order is what produces the contract's precedence. No stage inspects a condition that a later stage owns.
+This replaces the Phase 1 validation-pipeline design. It is a deliberate
+performance-over-correctness trade, not an implementation shortcut.
 
-## 2. The pipeline
+## 2. Target pipeline
 
-| Stage | Component | Checks | Codes |
-|---|---|---|---|
-| 1. Structural | `RequestParser` | Envelope shape against the JSON Schema: required fields, undeclared fields, `contractVersion`, `operation`, `requestId` length, JSON types, parse failure. | `MALFORMED_REQUEST` |
-| 2. State | `OperationDispatcher` | The DT-5 intake gate from IC 6.1. | `INVALID_STATE` |
-| 3a. Model | `DimensionModelBuilder` | `initialize` only: format value, duplicate ids and keys, dangling parents, cycles. | `INVALID_DIMENSION_DEFINITION` |
-| 3b. Semantic | `SpanResolver` | Benefit operations: dimension identifiers and value keys against the loaded model. | `UNKNOWN_DIMENSION`, `UNKNOWN_DIMENSION_VALUE` |
-| 4. Formula | `FormulaValidator` | Non-null, object, within 65,536 serialized UTF-8 bytes. | `INVALID_FORMULA` |
-| 5. Identity | `BenefitStore` | Duplicate canonical span; absent span for update, delete, exact query. | `DUPLICATE_SPAN`, `NOT_FOUND` |
-| 6. Index | `IndexAdapter` | Internal index failure. | `INDEX_FAILURE` |
-
-## 3. Structural validation is schema-driven
-
-DT-1's R1 recorded that TypeScript types are erased at runtime and cannot reject undeclared fields, and DEC-6 resolved to drive runtime validation from the existing JSON Schema. The prototype does exactly that: it loads `docs/schemas/plan-line-to-span-v1.schema.json` and compiles it.
-
-This matters beyond convenience. The schema is already the structural contract, already validated in the readiness review, and already the thing the interface contract points to. Hand-writing equivalent checks would create a second structural authority that could drift from the first — the divergence problem WP-2 solved for the prose documents, reappearing in code.
-
-The schema is Draft 2020-12, so the validator must be configured for that dialect. Using a Draft-07 default fails outright, which is a useful failure: it cannot silently validate against the wrong dialect.
-
-## 4. How IC 7 precedence is preserved
-
-IC 7 requires that a condition with a dedicated semantic code not be pre-empted by structural rejection. Two fields are affected, and the mechanism is the same for both: **the schema deliberately does not constrain them.**
-
-| Field | Schema treatment | Owning stage | Code |
-|---|---|---|---|
-| `formula` | Unconstrained; any JSON value validates | 4 | `INVALID_FORMULA` |
-| `payload.format` | Typed as a string, not a constant | 3a | `INVALID_DIMENSION_DEFINITION` |
-
-Because stage 1 validates against that schema, it structurally *cannot* reject either field. The precedence is not enforced by an ordering convention someone must remember; it is enforced by the absence of a constraint. This is the same defect the WP-7 review caught as ISSUE-03, now impossible rather than merely avoided.
-
-The two `$comment` annotations added to the schema in DT-2a explain the omission at the point where a future maintainer would otherwise be tempted to "fix" it by adding the constraint back.
-
-## 5. Verification
-
-The exit criterion is that the twelve invalid messages from the readiness review resolve to their documented codes under the designed pipeline. Run against the real schema:
-
-```
---- the twelve invalid messages ---
-pass  MALFORMED_REQUEST            RequestParser          missing envelope fields
-pass  INVALID_FORMULA              FormulaValidator       formula null
-pass  UNKNOWN_DIMENSION            SpanResolver           unknown dimension
-pass  UNKNOWN_DIMENSION_VALUE      SpanResolver           unknown value
-pass  MALFORMED_REQUEST            RequestParser          extra top-level field
-pass  MALFORMED_REQUEST            RequestParser          update with replacementSpan
-pass  MALFORMED_REQUEST            RequestParser          bad contract version
-pass  MALFORMED_REQUEST            RequestParser          numeric dimension value
-pass  INVALID_DIMENSION_DEFINITION DimensionModelBuilder  init bad format
-pass  INVALID_DIMENSION_DEFINITION DimensionModelBuilder  init dangling parentKey
-pass  MALFORMED_REQUEST            RequestParser          queryEmployee wrong payload
-pass  MALFORMED_REQUEST            RequestParser          requestId too long
-
---- IC 7 precedence ---
-pass  INVALID_STATE                OperationDispatcher    state beats payload error
-pass  UNKNOWN_DIMENSION            SpanResolver           unknown dim beats formula
-pass  INVALID_FORMULA              FormulaValidator       oversized formula
-pass  INVALID_FORMULA              FormulaValidator       formula array rejected
-pass  OK                           -                      valid create succeeds
-pass  OK                           -                      retry init from failed
-
-18/18 resolve to the documented code
-```
-
-The third column is the owning component, so the run confirms both the code and that DT-4's ownership assignment holds in practice.
-
-Six checks beyond the required twelve cover conditions the review did not exercise: state precedence over payload errors, semantic precedence within stage ordering, the byte-size limit, arrays rejected as formulas (an array is an object in JavaScript, so this is a real trap), and two positive paths including the retry from `failed` that ISSUE-04 concerned.
-
-## 6. Error response construction
-
-Every rejection returns the same envelope shape, per IC 6: `ok: false`, the parsed `operation` when available, the echoed `requestId` when validly supplied, and an `error` object carrying the stable `code`.
-
-Two rules constrain what may appear:
-
-**`message` is human-readable and unstable.** Callers must use `error.code`. The message must never embed a span, dimension value, or formula fragment, which would leak the payload data the observability contract's privacy rules exclude. The same discipline applies here even though IC 6 does not say so directly, because an error message is as observable as a log record.
-
-**`error.details.state` is the only structured detail.** IC 6 defines it for `INVALID_STATE`. No other detail field is introduced; adding one would extend the contract.
-
-## 7. Relationship to observability
-
-Each pipeline outcome produces exactly one log record through `ObservabilityEmitter` (DT-4's DEC-32). The `errorCode` field carries the same code the response carries, so the log and the response can never disagree about what happened.
-
-Stage 1 failures are the one case needing care: if the envelope cannot be parsed, `operation` may be unknown. The observability contract requires `operation` on every record. DT-8 must decide how an unparseable request is recorded, and the acceptance catalogue's `AC-VAL-06` already qualifies its expectation with "when an operation is parseable." Flagged as an open item.
-
-## 8. Decisions recorded
-
-| ID | Decision | Rationale |
+| Stage | Component | What remains |
 |---|---|---|
-| DEC-40 | Structural validation compiles the project's JSON Schema at runtime | DT-1 DEC-6; avoids a second structural authority that could drift. |
-| DEC-41 | The validator must be configured for Draft 2020-12 | The schema declares that dialect; a Draft-07 default fails loudly rather than validating wrongly. |
-| DEC-42 | IC 7 precedence is preserved by the schema not constraining `formula` and `format` | Structural rejection becomes impossible rather than merely avoided. |
-| DEC-43 | Error messages never embed payload data | An error message is as observable as a log record; the privacy rationale applies equally. |
-| DEC-44 | `error.details.state` is the only structured detail field | Anything further would extend the contract. |
+| 1. Parse | `RequestParser` | Parse JSON and enforce the closed structural envelope needed to select one of six operations. |
+| 2. State | `OperationDispatcher` | Return `INVALID_STATE` when the lifecycle gate rejects the operation. |
+| 3. Resolve | `DimensionModelBuilder` / `SpanResolver` | Build intervals, canonical spans, boxes, and points without semantic checks. |
+| 4. Stored state | `SpanStore` | Return `DUPLICATE_SPAN` or `NOT_FOUND` before mutation. |
+| 5. Execute | `IndexAdapter` / `RTreeIndex` | Execute directly; unexpected errors propagate. |
+| 6. Observe | `ObservabilityEmitter` | Emit a completion record; sink failure may propagate. |
 
-## 9. Open items
+There is no general error-mapping stage.
 
-| Item | Owner task |
-|---|---|
-| How an unparseable request is logged when `operation` is unknown | DT-8 |
-| Promoting the eighteen checks to a permanent test suite | DT-9 |
-| Whether `ajv` or another validator is the final choice | Implementation; DEC-40 and DEC-41 constrain the choice to a Draft 2020-12 capable validator |
+## 3. Structural boundary
 
-## 10. Limitations
+The parser retains `MALFORMED_REQUEST` because the program cannot invoke a typed
+operation until raw JSON selects a known operation and payload shape. It checks:
 
-The prototype implements the pipeline stages as functions and drives real messages through them against the real schema. Stages 3a, 3b, 4, and 5 are simplified stand-ins: the model builder checks the documented conditions but is not DT-2's full builder, and the store is a set of canonical keys rather than `BenefitStore`.
+- valid JSON without duplicate object members;
+- the closed top-level envelope;
+- supported `contractVersion` and operation names;
+- operation-specific required fields and JSON types; and
+- the optional `requestId` shape.
 
-What the run establishes is that the *ordering* produces the contract's codes and that schema-driven structural validation behaves as DEC-40 assumes. Whether the real components behave identically is DT-9's concern.
+It does not check whether domain identifiers exist, whether hierarchy links are coherent,
+or whether dimension-map values have meaning in the current model.
+
+The executable schema remains Phase 1-shaped during docs-only E0 and changes with the
+parser in E1 so the intermediate branch remains regression-green.
+
+## 4. Removed validation
+
+E2 deletes checks for:
+
+- dimension-definition format meaning, duplicate identifiers/keys, dangling parents,
+  and cycles;
+- unknown span or plan-line dimensions and values;
+- R-tree axis count and box arity;
+- split-path assertions and other internal invariants;
+- log-record values constructed by the program itself; and
+- re-validation of values already narrowed by the structural parser.
+
+Invalid data is outside the contract. It may yield no matches, an uncaught exception,
+corrupt internal state, or non-termination. In particular, removing hierarchy-cycle
+detection can turn invalid initialization into an infinite traversal; the caller owns
+that risk.
+
+## 5. Retained state outcomes
+
+| Code | Owner | Behavior |
+|---|---|---|
+| `INVALID_STATE` | `OperationDispatcher` | Reject an operation not accepted by the lifecycle gate. |
+| `DUPLICATE_SPAN` | `SpanStore` | Reject duplicate create or an update replacement occupied by another entry. |
+| `NOT_FOUND` | `SpanStore` | Report absent exact query/delete/update source. |
+
+These are ordinary branches over state, not exceptions and not judgments about input
+correctness. `MALFORMED_REQUEST` belongs to the structural boundary described in section
+3.
+
+## 6. Update integrity and precedence
+
+`updateSpan({span, replacementSpan})` resolves declared outcomes before mutation:
+
+```text
+source absent                              -> NOT_FOUND
+source present, different target occupied  -> DUPLICATE_SPAN
+otherwise                                  -> remove source; insert target; success
+```
+
+Same-identity replacement succeeds. A declared failure leaves the source and count
+unchanged. Once mutation begins, an unexpected index failure is not caught or translated;
+ECP-1 makes no rollback guarantee for that out-of-contract path.
+
+## 7. Exception posture
+
+Production dispatch does not catch implementation exceptions to build an error envelope.
+The former general index-failure response is removed. Observability does not isolate sink
+failures. Defensive assertions do not manufacture exceptions for invalid internal data.
+
+Language/runtime exceptions may still arise naturally. “No exception handling” means
+they propagate rather than being converted into stable application behavior.
+
+## 8. Observability relationship
+
+Only operations reaching a declared success or state outcome are guaranteed a completion
+record. Records use the four interface codes and never include domain payload. An
+uncaught failure is not guaranteed to produce a record through this emitter; process
+supervision is outside the demo.
+
+## 9. Decisions recorded
+
+| ID | Decision | Status |
+|---|---|---|
+| DEC-40 | Compile the JSON Schema once and use it in request parsing. | Retained for the structural boundary; schema shape changes in E1. |
+| DEC-41 | Reject duplicate JSON members before ordinary parsing. | Retained as structural ambiguity prevention. |
+| DEC-42 | Leave one removed payload field unconstrained for semantic precedence. | Superseded; the field and semantic path no longer exist. |
+| DEC-43 | Semantic dimension-definition errors have dedicated responses. | Superseded by optimistic execution. |
+| DEC-44 | Translate index exceptions into a stable response. | Superseded; exceptions propagate. |
+| DEC-67 | Domain data is trusted after structural parsing. | Added by ECP-1. |
+| DEC-68 | Stored-state outcomes are direct branches, not caught exceptions. | Added by ECP-1. |
+
+## 10. Verification
+
+E0 marks nine Phase 1 acceptance cases retired. E2 must list every removed regression
+test by case ID, prove the remaining suite green, and statically inspect production code
+for obsolete guards, catch/translate layers, and removed error codes.
+
+The absence of validation cannot be established solely by sending valid requests; review
+must inspect the deleted paths as well as the surviving behavior.
+
+## 11. Limitations
+
+This posture intentionally gives no correctness guarantee for invalid domain data.
+Performance evidence is collected in E3; E0 and E2 do not claim a speedup merely from
+deleting code.

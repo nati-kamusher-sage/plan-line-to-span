@@ -25,25 +25,27 @@ test('the interface contract still contains exactly eight JSON examples', () => 
   assert.equal(extractJsonExamples(CONTRACT_TEXT).length, 8);
 });
 
-test('all six request examples parse as structurally valid requests', () => {
+test('all six ECP-1 target request examples are valid JSON with the target operations', () => {
+  // E0 updates the prose contract before E1 changes the executable schema and
+  // parser. Keep this transition explicit and bounded: while the contract
+  // carries the E1-transition marker, verify target example syntax and the
+  // exact target operation vocabulary. E1 must restore parseRequest() here
+  // when schema and parser move atomically.
+  assert.match(CONTRACT_TEXT, /Status \| ECP-1 target contract; executable schema follows in E1/);
   const examples = extractJsonExamples(CONTRACT_TEXT);
-  const requests = examples.slice(0, 6); // sections 4.1-4.6: initialize through queryEmployee
-  for (const raw of requests) {
-    assert.doesNotThrow(() => parseRequest(raw), `example failed to parse: ${raw}`);
-  }
+  const operations = examples.slice(0, 6).map((raw) => {
+    const parsed = JSON.parse(raw) as { operation?: unknown };
+    return parsed.operation;
+  });
+  assert.deepEqual(operations, [
+    'initialize', 'createSpan', 'updateSpan', 'deleteSpan', 'querySpan', 'queryPlanLine',
+  ]);
 });
 
-test('the two response examples are not requests and are correctly rejected as such', () => {
-  // These are success/error response envelopes (IC 5-6), not requests. They
-  // lack `payload` and instead carry `ok`/`data` or `ok`/`error`, so
-  // RequestParser -- which validates only the request schema -- correctly
-  // rejects them. Response construction and validation belong to a later
-  // task (T7/T10), not to RequestParser.
+test('the two ECP-1 response examples are valid JSON success and failure envelopes', () => {
   const examples = extractJsonExamples(CONTRACT_TEXT);
-  const responses = examples.slice(6, 8);
-  for (const raw of responses) {
-    assert.throws(() => parseRequest(raw), MalformedRequestError, `expected a response envelope to be rejected as a request: ${raw}`);
-  }
+  const responses = examples.slice(6, 8).map((raw) => JSON.parse(raw) as { ok?: unknown });
+  assert.deepEqual(responses.map((response) => response.ok), [true, false]);
 });
 
 // ---- AC-VAL-03: duplicate object members ----
