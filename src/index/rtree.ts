@@ -157,6 +157,24 @@ export class RTree<T> {
     return this._search(box, intersects);
   }
 
+  /**
+   * Identical to `search`, except `onComparison` is invoked once per box
+   * test performed during the traversal (DT-7 section 7, DEC-51).
+   *
+   * This exists only for the T12 performance harness: production callers use
+   * `search`, which this method does not alter in any way, so the counter
+   * costs nothing on the path every other caller takes. `contains` itself is
+   * not modified or wrapped globally -- the counting happens in a closure
+   * built fresh for this one call, per DT-1's principle that instrumentation
+   * should not be live by default.
+   */
+  searchCounting(point: Point, onComparison: () => void): T[] {
+    return this._search(point, (box, query) => {
+      onComparison();
+      return contains(box, query);
+    });
+  }
+
   private _search(query: Box, test: (candidate: Box, query: Box) => boolean): T[] {
     const result: T[] = [];
     if (this._size === 0) return result;
