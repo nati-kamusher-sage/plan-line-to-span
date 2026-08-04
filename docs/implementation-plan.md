@@ -390,3 +390,20 @@ This plan sequences work; it does not schedule it. No effort estimates are given
 The task boundaries are a judgment about what fits one session. Some will prove wrong. IR-3 covers the response: split the task and update the plan, rather than reporting partial work as complete.
 
 The authorship-independence limitation recorded in the WP-7 readiness review and DT-10 section 9 extends to implementation. Every document, every design record, and every task in this plan originates in a single authorship chain. The regression suite is real evidence and the mechanical checks have caught genuine defects, but neither substitutes for a reviewer from outside that chain.
+
+## 11. ECP-1 supersession
+
+Phase 1 is complete as historical implementation evidence and is superseded by
+[ECP-1](ECP/ECP-1/ECP-1.md) and its
+[implementation plan](ECP/ECP-1/ECP-1-implementation-plan.md) for current behavior.
+
+ECP-1 replaces the Phase 1 concept vocabulary with direct span storage and plan-line
+matching, changes update into span replacement, and adopts optimistic domain execution
+while retaining declared lifecycle and stored-state outcomes. T8 is formally retired
+rather than deferred: its five semantic-validation cases are among the nine catalogue
+cases retired by ECP-1.
+
+The T1–T13 sections and recorded outcomes remain unchanged because they describe what was
+actually built and tested in Phase 1. E0–E3 are the authoritative forward sequence;
+readers must not treat historical Phase 1 operation names, payload shapes, or cumulative
+case counts as the target contract.

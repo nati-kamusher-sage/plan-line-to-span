@@ -2,154 +2,129 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | Draft; awaiting technical-lead approval |
-| Design task | DT-3 of the [Preliminary Design Execution Plan](../preliminary-design-plan.md) |
-| Governing input | [Operational Concept](../operational-concept.md) 6.4, 7, 15.1, and 16.1.6–7 |
-| Depends on | [DT-1](dt-1-architectural-context.md), [DT-2a](dt-2a-index-library-evaluation.md) |
+| Status | ECP-1 revised design |
+| Governing input | [Operational Concept](../operational-concept.md) 6.4, 7, 15, 16 |
+| Depends on | [DT-1](dt-1-architectural-context.md), [DT-2](dt-2-dimension-to-axis-mapping.md) |
 | Retires | RISK-2 |
-| Prototypes | [representation probe](prototypes/dt-3-representation-probe.mjs), [zero-dimensional probe](prototypes/dt-3-zero-dimensional-probe.mjs) |
+| Historical prototypes | [representation probe](prototypes/dt-3-representation-probe.mjs), [zero-dimensional probe](prototypes/dt-3-zero-dimensional-probe.mjs) |
 
 ## 1. Decision
 
-**Store the global benefit inside the index as an all-axis-covering box. Do not give it a dedicated slot outside the index.**
+Store the global span inside the index as an all-axis-covering box. Do not give it a
+dedicated slot. A zero-dimensional model is an index with zero axes and at most one
+entry, whose box is the empty interval list.
 
-A zero-dimensional model is represented as an index with zero axes, holding at most one entry whose box is the empty list of intervals. No special case is needed for it.
+ECP-1 changes the stored payload to the span itself and changes update into identity
+replacement. Neither change alters the representation decision.
 
-This resolves what WP-3 confirmed as feasible but deliberately left unspecified.
-
-## 2. What the baseline requires
+## 2. Required behavior
 
 | Requirement | Source |
 |---|---|
-| An empty span is valid and represents the one possible global benefit. | OC 6.4, 16.1.6 |
-| The global benefit applies to every valid plan line, including an empty one. | OC 6.4 |
-| `{}` is the canonical empty span and works for exact query, update, and delete. | OC 6.4 |
-| At most one global benefit can exist, because a span is the benefit's identity. | OC 6.6 |
-| A dimension model with zero dimensions is valid; the only possible span is `{}`. | OC 7, 16.1.7 |
-| No externally observable behavior may depend on whether the global benefit is stored inside or outside the index. | OC 15.1, restated as the DT-3 constraint in the design plan |
+| `{}` is the canonical empty span. | OC 6.4 |
+| The empty span applies to every plan line, including `{}`. | OC 6.4, 9.2 |
+| Exact query and delete address `{}` by canonical identity. | OC 9.1, 11 |
+| `updateSpan` may replace `{}` with another span or another span with `{}`. | OC 11.3 |
+| At most one `{}` entry exists because span identity is unique. | OC 6.4, 14 |
+| A zero-dimensional model is valid and can express only `{}`. | OC 7, 16 |
 
-## 3. The mapping this rests on
+## 3. Geometry
 
-DT-3 needs only the general shape of the span-to-geometry mapping, not the specific hierarchy interval-labelling scheme that DT-2's main body will fix. The shape is:
+A constrained dimension occupies its value interval. An omitted dimension occupies the
+whole axis. The empty span omits every dimension and therefore covers the entire space.
+Every plan-line point lies inside that box.
 
-- A dimension constrained by a span occupies the interval belonging to that dimension value.
-- **A dimension omitted from a span occupies the entire axis.** OC 6.4 already states that an omitted dimension is unconstrained and behaves as a wildcard.
+This is the ordinary omitted-dimension rule applied to all axes, not a special case.
 
-The empty span omits every dimension. It is therefore not a special case at all: it is the ordinary rule applied to all axes at once, producing the box that covers the whole coordinate space. Every plan-line point lies inside that box, which is precisely the required "applies to every valid plan line."
+## 4. Representation alternatives
 
-This is the central observation of DT-3. The global benefit looks exceptional in the prose but is the natural limit of a rule the design already needs.
+### 4.1 Selected: ordinary in-index entry
 
-## 4. Options considered
+`{}` is stored like every other span. Create, exact lookup, update, delete, and matching
+use the same paths.
 
-### Option A — inside the index, full-cover box (recommended)
+### 4.2 Rejected: dedicated external slot
 
-The global benefit is an ordinary entry whose box spans every axis. Creation, exact lookup, update, delete, and employee matching all use the same code paths as any other benefit.
+A separate nullable slot would require an empty-span branch in every store operation and
+would require `spanCount`, reinitialization, and result composition to account for two
+storage locations.
 
-### Option B — a dedicated slot outside the index
+The Phase 1 prototype drove both representations through the global, zero-dimensional,
+coexistence, and negative-exact scenarios:
 
-The engine holds a nullable `global` field. Every operation branches on whether the span is empty, and employee-query results are the index results with the global benefit appended.
-
-### 4.1 Both satisfy the observable-behavior constraint
-
-OC 15.1 requires that the choice not be externally detectable. Both options were implemented and driven through the acceptance-derived scenarios.
-
-The probe runs `AC-GLOBAL-01` through `AC-GLOBAL-04`, `AC-ZERO-01`, coexistence of the global benefit with an ordinary benefit, and the negative case where an exact query for a different span must not return the global benefit. It then replays identical operation sequences against both implementations and diffs every response.
-
-```
+```text
 34/34 checks passed
-
---- observable-equivalence diff (A vs B) ---
-  no observable difference between A and B
+no observable difference between the two representations
 ```
 
-Responses, `benefitCount`, and error codes are identical across both representations for every sequence tested. OC 15.1 is satisfied either way, so the constraint does not decide the question. Structure does.
+The probe used the previous response payload shape, but its relevant evidence is span
+identity, counts, duplicate detection, and matching. Those properties survive ECP-1.
 
-### 4.2 Why Option A
+## 5. Why the in-index representation remains correct
 
-**It removes branching rather than adding it.** Option B introduces an `isEmpty(span)` test at the head of create, exact query, update, delete, and employee query — five branches, each a place where the global benefit could diverge from ordinary behavior. Option A has none. The probe made this concrete: `RepB` needed roughly 40 percent more code than `RepA` to produce identical results.
+- **No empty-span branches.** The ordinary wildcard geometry handles `{}`.
+- **One authoritative count.** `spanCount` is the index size.
+- **Uniform uniqueness.** A second `{}` is the ordinary `DUPLICATE_SPAN` case.
+- **Atomic clearing.** Reinitialization discards one index reference.
+- **Unspecified result order.** The index composes global and constrained matches without
+  manufacturing an append order.
+- **Direct payload.** The indexed value is now the canonical span, so the representation
+  is smaller without changing geometry.
 
-**It keeps `benefitCount` honest.** Obs 3 requires `benefitCount` on every log record. Option A reads the index size. Option B computes `index.size + (global ? 1 : 0)`, which is a second place to get the count wrong and is exactly the kind of drift `AC-OBS-03` would have to catch.
+## 6. Zero-dimensional model
 
-**Duplicate detection stays uniform.** `AC-GLOBAL-03` requires a second `{}` create to fail with `DUPLICATE_SPAN`. Under Option A this is the ordinary canonical-span identity check that OC 6.6 already mandates for every benefit; the "at most one global benefit" property follows from span uniqueness rather than needing separate enforcement.
+At zero axes:
 
-**Reinitialization stays atomic for free.** OC 8.3 requires that a successful reinitialization clear all benefits atomically. Option A discards one index reference. Option B must also clear the separate global slot, and a design that forgets to do so would leave a stale global benefit alive across reinitialization — a defect that `AC-INIT-04` would catch, but only because someone thought to write it.
-
-**Ordering insignificance is preserved.** OC 14.3 and `AC-MATCH-09` state that result ordering is not significant. Option B's append places the global benefit last by construction, which is not wrong but quietly creates an ordering an implementer might come to rely on. Option A leaves ordering to the index, where it is genuinely unspecified.
-
-## 5. The zero-dimensional model
-
-This is the part WP-3 flagged as the feasibility question, and it is where an off-the-shelf R*-tree would have caused trouble. Since DT-2a settled on implementing the index directly, the design controls the degenerate case rather than inheriting a library's assumptions about it.
-
-The second probe exercises the R*-tree primitives at zero dimensions:
-
-```
-zero-dim area  = 1   (product over no axes)
-zero-dim margin= 0   (sum over no axes)
-contains(point=[]) = true   (vacuous truth -> global matches all)
-chooseSplitAxis over 0 axes = -1   (no axis to split on)
+```text
+area([])             = 1   (empty product)
+margin([])           = 0   (empty sum)
+contains([], [])     = true
+chooseSplitAxis([])  = undefined, but unreachable
 ```
 
-Three of the four primitives behave correctly without special-casing. Area is the empty product, margin the empty sum, and containment is vacuously true for a box with no constraints — which yields exactly the required behavior that the global benefit matches an empty plan line.
+Only `{}` can be expressed, and retained duplicate detection limits the index to one
+entry. A node split is therefore unreachable.
 
-Only the split heuristic is undefined, because it must choose among axes and there are none. **That path is unreachable.** In a zero-dimensional model the only expressible span is `{}`, and OC 6.6 permits at most one benefit per canonical span. The index can therefore hold at most one entry and can never reach the node capacity that triggers a split.
+Phase 1 DEC-17 required an assertion in the split path. ECP-1's optimistic posture
+supersedes that guard: the implementation relies on the one-entry invariant without a
+defensive assertion. If invalid internal state reaches zero-axis splitting, behavior is
+outside the contract.
 
-The design records this as an explicit invariant rather than leaving it to chance:
+### 6.1 Index requirements
 
-> In a model with zero dimensions, the index holds at most one entry. Node splitting is unreachable. The implementation shall assert this invariant rather than rely on it silently.
+1. Axis count is fixed at initialization and may be zero.
+2. Box coordinate-array length equals axis count; zero length is valid.
+3. Area, margin, and enlargement use empty-product/empty-sum conventions.
+4. Containment over zero axes is true.
+5. Correct caller data and duplicate detection keep zero-axis splitting unreachable.
 
-The assertion matters. If a future change made a second zero-dimensional span expressible, an assertion fails loudly instead of the split heuristic reading an undefined axis.
+## 7. Operation behavior for `{}`
 
-### 5.1 Requirements on the index implementation
-
-DT-2's main body and the implementation must honor these:
-
-1. Axis count is fixed at initialization from the dimension model and may be zero.
-2. Boxes are coordinate arrays whose length equals the axis count; length zero is valid.
-3. Area, margin, and enlargement use the empty product and empty sum conventions.
-4. Containment over zero axes returns true.
-5. Node splitting asserts a non-zero axis count.
-
-## 6. How each operation behaves
-
-With Option A, no operation needs an empty-span branch.
-
-| Operation with `{}` | Mechanism | Verifying case |
+| Operation | Mechanism | Case |
 |---|---|---|
-| Create | Canonical span `{}` maps to the full-cover box; ordinary duplicate check applies. | `AC-GLOBAL-01`, `AC-GLOBAL-03` |
-| Exact query | Canonical-span identity lookup. Hierarchy does not broaden it, so no other span can be returned for `{}` and `{}` is not returned for any other span. | `AC-GLOBAL-04` |
-| Update | Identity lookup, then complete formula replacement; the span is unchanged. | `AC-GLOBAL-04` |
-| Delete | Identity lookup, then removal; `benefitCount` falls to the index size. | `AC-GLOBAL-04` |
-| Employee query, non-empty plan line | The full-cover box contains every point. | `AC-GLOBAL-01` |
-| Employee query, empty plan line | Containment over zero axes is vacuously true. | `AC-GLOBAL-02`, `AC-ZERO-01` |
-| Coexistence with ordinary benefits | The global benefit is one entry among others; results compose naturally. | Probe coexistence checks |
+| `createSpan` | Insert full-cover box after ordinary duplicate check. | AC-GLOBAL-01, AC-GLOBAL-03 |
+| `querySpan` | Canonical-key exact lookup. | AC-GLOBAL-04 |
+| `updateSpan` | Remove `{}` and create `replacementSpan` after both state checks. | AC-GLOBAL-04 |
+| `deleteSpan` | Canonical-key removal; `spanCount` becomes index size. | AC-GLOBAL-04 |
+| `queryPlanLine` | Full-cover box contains every point. | AC-GLOBAL-01, AC-GLOBAL-02 |
+| Zero-dimensional query | Empty-box containment is vacuously true. | AC-ZERO-01 |
 
-## 7. Decisions recorded
+## 8. Decisions recorded
 
-| ID | Decision | Rationale |
+| ID | Decision | ECP-1 status |
 |---|---|---|
-| DEC-14 | The global benefit is stored inside the index as an all-axis-covering box | Removes five conditional branches; keeps `benefitCount`, duplicate detection, and reinitialization uniform. |
-| DEC-15 | The empty span is not special-cased; it is the omitted-dimension rule applied to every axis | OC 6.4 already defines an omitted dimension as unconstrained. |
-| DEC-16 | A zero-dimensional model is an index with zero axes | Containment is vacuously true, which is the required behavior. |
-| DEC-17 | Node splitting asserts a non-zero axis count; the zero-dimensional split path is unreachable by the one-benefit invariant | Fails loudly if the invariant is ever broken. |
-| DEC-18 | Empty product and empty sum conventions for area and margin at zero axes | Mathematically correct and requires no special case. |
+| DEC-14 | Store the global span inside the index as an all-axis-covering box. | Retained; payload is now the span itself. |
+| DEC-15 | Treat `{}` as the omitted-dimension rule applied to every axis. | Retained. |
+| DEC-16 | Represent a zero-dimensional model as an index with zero axes. | Retained. |
+| DEC-17 | Assert non-zero axes in the split path. | Superseded by optimistic execution; guard removed. |
+| DEC-18 | Use empty product and empty sum at zero axes. | Retained. |
 
-## 8. RISK-2 retirement
+## 9. Risk disposition
 
-RISK-2 was that an R*-tree implementation may require at least one dimension, while a zero-dimensional model and an empty global span are both valid.
+RISK-2 remains retired. The zero-dimensional representation is valid, containment has the
+required vacuous semantics, and retained duplicate detection makes the undefined split
+path unreachable for valid state. ECP-1 deliberately trades the former defensive
+assertion for optimistic execution.
 
-The risk is retired. The zero-dimensional model is representable, the degenerate primitives behave correctly under standard conventions, the one path that is undefined is provably unreachable and is guarded by an assertion, and both candidate representations were shown to satisfy the acceptance-derived scenarios with no observable difference between them.
-
-The retirement rests on prototypes rather than argument, as the design plan requires. Two qualifications are recorded honestly.
-
-The probe's index is a linear-scan stand-in with correct containment semantics, not an R*-tree. It settles representation and observable equivalence, which is what DT-3 owns. It does not demonstrate the pruning behavior OC 15.2 requires; that is DT-2's prototype and DT-7's measurement.
-
-The probe covers the five `AC-GLOBAL-*` and `AC-ZERO-*` cases plus coexistence and one negative case. The full catalogue runs against the real implementation in DT-9.
-
-## 9. Open items
-
-| Item | Owner task |
-|---|---|
-| Hierarchy interval labelling that gives each dimension value its axis interval | DT-2, main body |
-| Node capacity and split parameters for the non-degenerate case | DT-2 |
-| Where the zero-axis invariant assertion lives | DT-4 |
-| Running the full acceptance catalogue against the real index | DT-9 |
+The historical probes use a scan stand-in and Phase 1 vocabulary. They establish
+representation equivalence, not current contract payloads or R*-tree performance.

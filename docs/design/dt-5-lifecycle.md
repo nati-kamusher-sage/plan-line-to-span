@@ -2,133 +2,96 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | Draft; awaiting technical-lead approval |
-| Design task | DT-5 of the [Preliminary Design Execution Plan](../preliminary-design-plan.md) |
-| Governing input | [Operational Concept](../operational-concept.md) 8, 14.2, 14.3; [Interface Contract](../interface-contract.md) 6.1 |
+| Status | ECP-1 revised design |
+| Governing input | [Operational Concept](../operational-concept.md) 8, 14; [Interface Contract](../interface-contract.md) 6.1 |
 | Depends on | [DT-4](dt-4-component-structure.md) |
-| Prototype | [lifecycle](prototypes/dt-5-lifecycle.mjs) |
+| Historical prototype | [lifecycle](prototypes/dt-5-lifecycle.mjs) |
 
 ## 1. Decision
 
-`LifecycleState` holds the four states and two pure functions: an **intake gate** deciding whether a request is accepted, and a **transition function** deciding the resulting state. Both are data-driven and are checked against IC 6.1 cell by cell.
+Retain the four lifecycle states and data-driven intake gate. `INVALID_STATE` remains
+declared state behavior. ECP-1 removes controlled semantic-initialization failures from
+the public contract; Failed-state retry/gating is verified through a test-only lifecycle
+hook rather than malformed input.
 
-The separation between intake and completion is the design's central distinction, and getting it wrong is the failure the prototype caught. Section 3 records it.
+## 2. Intake gate
 
-## 2. The intake gate
-
-IC 6.1 reduces to one rule:
-
-> `initialize` is accepted unless the utility is already initializing. Every other operation requires `ready`.
-
-```
-accepts(state, op):
-    if state == initializing:  return false
-    return op == initialize ? true : state == ready
+```text
+accepts(state, operation):
+  if state == initializing: return false
+  if operation == initialize: return true
+  return state == ready
 ```
 
-Checked against all 24 state-operation cells transcribed from the contract:
+Thus `initialize` is accepted from Uninitialized, Ready, and Failed. Every other operation
+requires Ready. Rejection leaves lifecycle and span storage unchanged.
 
-```
-all lifecycle checks passed (24 gate cells + paths + invariants)
-```
+## 3. Intake and completion
 
-The exit criterion — that the table maps onto the gating logic with `initialize` accepted from `Failed` — is met. The `failed`/`initialize` cell is the one the WP-7 review flagged as ISSUE-04, and it is now enforced by the same expression that enforces every other cell rather than by a special case that could be dropped.
+The gate applies to new requests, not completion of work already accepted. Successful
+initialization moves `initializing` to `ready`. The historical failure transition remains
+available for unexpected initialization failure, but ECP-1 does not translate such a
+failure into a stable response or guarantee cleanup for invalid input.
 
-## 3. Intake and completion are different events
-
-The first version of the transition function applied the intake gate to every event. It failed two checks:
-
-```
-FAIL AC-INIT-01 uninit -> initializing -> ready: got initializing want ready
-FAIL AC-INIT-02 first init failure -> failed:    got initializing want failed
-```
-
-The reason is worth recording, because the same mistake is easy to make in the implementation. From `initializing` the gate accepts nothing — that is its whole purpose. But an initialization that is already running must still be able to *finish*. Applying the gate to its completion strands the utility in `initializing` forever.
-
-The gate governs **incoming requests**. Completions are consequences of a request already accepted, and are not gated:
-
-```
-next(state, op, outcome, priorState):
-    if outcome == start:
-        if not accepts(state, op): return state        # rejected intake, unchanged
-        return op == initialize ? initializing : state
-    # completion of work already in flight
-    if state != initializing: return state             # benefit ops never move state
-    if outcome == success: return ready
-    return priorState == ready ? ready : failed
+```text
+uninitialized --initialize--> initializing --success--> ready
+failed        --initialize--> initializing --success--> ready
+ready         --initialize--> initializing --success--> ready
+ready         --other accepted operation/outcome--------------> ready
+any           --rejected intake-------------------------------> unchanged
 ```
 
-`priorState` is what the utility was before initialization began. It is the mechanism for OC 8.4's distinction: a failed *first* initialization enters `Failed`, while a failed *reinitialization* returns to `Ready` with the previous model intact.
+Failed is retained as an observable lifecycle value and retry state. The acceptance suite
+uses controlled state setup for it because invalid domain data is outside the contract.
 
-## 4. Transitions
+## 4. Successful reinitialization
 
-| From | Event | To | Source |
-|---|---|---|---|
-| `uninitialized` | `initialize` accepted | `initializing` | OC 8.2 |
-| `failed` | `initialize` accepted (retry) | `initializing` | OC 8.4 |
-| `ready` | `initialize` accepted (reinitialization) | `initializing` | OC 8.3 |
-| `initializing` | success | `ready` | OC 8.3 |
-| `initializing` | failure, no prior Ready model | `failed` | OC 8.4 |
-| `initializing` | failure, prior Ready model | `ready` | OC 8.3 |
-| `ready` | any benefit operation, any outcome | `ready` | OC 8.3, DT-3 |
-| any | rejected request | unchanged | OC 14.2 |
+For valid input:
 
-The prototype confirms all four states are reachable and none is stranded, and that `Ready` is stable under every benefit operation and outcome — including `INDEX_FAILURE`, per DT-3's DEC-17 and the operational concept's `Ready --> Ready` edge.
+1. accept `initialize` and enter `initializing`;
+2. build a candidate immutable dimension model;
+3. create a fresh empty index;
+4. replace live model and store references together;
+5. enter `ready` and report `spanCount: 0`.
 
-## 5. Atomic reinitialization
+No separate clearing loop exists. The new store is empty by construction. ECP-1 does not
+promise preservation of the prior model when invalid input or an unexpected exception
+interrupts this sequence.
 
-DT-4's DEC-33 placed candidate construction before any live state change. The sequence:
+## 5. Serial processing
 
-1. The dispatcher accepts `initialize` and sets `initializing`, recording `priorState`.
-2. `DimensionModelBuilder` builds a **candidate** `DimensionModel`. The live model is untouched.
-3. On failure: discard the candidate, restore `priorState` semantics per section 3, emit the error. The previous model and all benefits remain exactly as they were.
-4. On success: create a fresh empty index, then swap both references in one step. Transition to `ready`.
+The dispatcher remains the single entry point and handlers remain synchronous. No queue
+or lock is added. The `handlers-never-await` static test protects the assumption that one
+accepted operation completes before the next begins.
 
-Because `DimensionModel` is immutable (DT-1's immutability principle) and `BenefitStore` holds the index by reference, step 4 is two assignments with no intervening observable state. There is no partially-built model a caller could see, satisfying OC 8.2's prohibition.
+## 6. Mutation outcomes
 
-Benefit clearing is not a separate operation. The new index *is* empty, so `benefitCount` reports zero the moment the swap completes — which is why `AC-INIT-04` and the observability contract's "successful reinitialization always returns `benefitCount: 0`" hold without explicit clearing logic that could be forgotten.
+`SpanStore` is the only owner of stored-span mutation and declared stored-state outcomes.
 
-## 6. Serial processing
+- Create checks duplicate identity before insert.
+- Delete checks exact presence before removal.
+- Update checks source presence and replacement collision before removal, then removes
+  the source and inserts the replacement.
 
-`OperationDispatcher` is the single entry point (DT-4's DEC-30). Combined with DT-1's single-threaded runtime and synchronous handlers, no two operations interleave.
+Declared `DUPLICATE_SPAN` and `NOT_FOUND` outcomes make no change. An unexpected failure
+after mutation begins is not caught or rolled back under ECP-1.
 
-The design does not add a queue or lock. DT-1's DEC-1 rationale was that serial processing holds by construction on this runtime; introducing a mechanism would imply the property needs enforcing and invite the belief that it is safe to make handlers concurrent later.
+## 7. Decisions recorded
 
-One obligation follows: **operation handlers must not await.** A handler that yields to the event loop mid-operation reopens interleaving. This is a constraint on the implementation, and DT-9 should include a test that the handler path is synchronous end to end.
-
-## 7. Mutation isolation
-
-OC 14.3 requires that a failed mutation leave no partial change. Three properties combine to give this without a transaction mechanism:
-
-**Validation completes before mutation.** DT-4's pipeline runs `RequestParser`, the state gate, `SpanResolver`, and `FormulaValidator` before `BenefitStore` is reached. By the time anything mutates, every rejection that can be predicted has been.
-
-**Only `BenefitStore` mutates.** Every other component returns a result. There is one place where state changes, so there is one place to reason about.
-
-**A single index operation is the commit point.** Create, update, and delete each reduce to one index call. There is no multi-step mutation that could fail halfway.
-
-`INDEX_FAILURE` is the residual case: an index operation that fails internally. The interface contract already requires that no partial mutation be committed, which the index implementation must honor — the entry is either inserted or it is not. DT-3's `AC-INIT-09` verifies the utility stays `Ready` with its benefits intact, and the readiness review's note that this case needs a fault-injection hook still applies.
-
-## 8. Decisions recorded
-
-| ID | Decision | Rationale |
-|---|---|---|
-| DEC-34 | The intake gate is one expression derived from IC 6.1, not per-state special cases | Every cell including `failed`/`initialize` is enforced by the same rule; ISSUE-04 cannot regress. |
-| DEC-35 | Intake and completion are distinct events; the gate applies only to intake | Gating completions strands the utility in `initializing`. Caught by the prototype. |
-| DEC-36 | The transition function takes `priorState` | Distinguishes first-initialization failure (`Failed`) from reinitialization failure (`Ready`). |
-| DEC-37 | Reinitialization swaps immutable model and index references in one step | No observable partial state; benefit clearing is implicit in the fresh index. |
-| DEC-38 | No queue or lock for serial processing | Holds by construction on the DT-1 runtime; a mechanism would imply it needs enforcing. |
-| DEC-39 | Operation handlers must be synchronous end to end | An await reopens interleaving that DEC-38 relies on being impossible. |
-
-## 9. Open items
-
-| Item | Owner task |
+| ID | ECP-1 status |
 |---|---|
-| Test that the handler path never awaits | DT-9 |
-| Fault-injection hook for `INDEX_FAILURE` | DT-9 |
-| Where `priorState` is stored during initialization | Implementation; a dispatcher local suffices |
+| DEC-34 | Retained: one intake expression covers every state/operation cell. |
+| DEC-35 | Retained: intake and completion are distinct events. |
+| DEC-36 | Revised: prior-state failure restoration is not contract behavior for invalid input. |
+| DEC-37 | Retained for successful valid reinitialization: swap model/store references. |
+| DEC-38 | Retained: no queue or lock. |
+| DEC-39 | Retained: handlers are synchronous end to end. |
 
-## 10. Limitations
+## 8. Verification
 
-The prototype models the lifecycle as pure functions and checks them against the contract table. It verifies the *rules*, not their wiring into a running dispatcher. That the implementation calls them at the right moments is DT-9's concern.
+Active lifecycle cases are AC-INIT-01, -03, -04, -06, -07, and -08. AC-INIT-02,
+AC-INIT-05, and AC-INIT-09 are retired because they require controlled semantic or index
+exception translation removed by ECP-1.
 
-The synchronous-handler obligation in DEC-39 is stated but not enforced by anything in this design. It depends on implementation discipline until DT-9 provides the test.
+The historical prototype remains evidence for the gate table, but its failure-response
+paths are superseded.

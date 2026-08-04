@@ -4,48 +4,58 @@
 |---|---|
 | Contract name | `plan-line-to-span` |
 | Contract version | `v1` |
-| Status | Draft |
+| Status | ECP-1 target contract; executable schema follows in E1 |
 | Governing behavior | [Operational Concept](operational-concept.md) |
-| Machine-readable schema | [plan-line-to-span-v1.schema.json](schemas/plan-line-to-span-v1.schema.json) |
+| Executable schema | [plan-line-to-span-v1.schema.json](schemas/plan-line-to-span-v1.schema.json) (Phase 1 shape until E1) |
 
 ## 1. Purpose and conformance
 
-This contract defines the JSON messages exchanged with the Plan Line to Span utility. It is transport-neutral: HTTP paths, message topics, and status-code mappings are outside its scope. A conforming implementation accepts the request envelopes in this document and returns the corresponding success or error envelopes.
+This contract defines the transport-neutral JSON messages exchanged with the utility.
+The operational concept governs behavior; this document supplies exact request,
+response, and state-outcome shapes.
 
-The operational concept governs business behavior if a conflict is found. This contract supplies the exact payload, response, and error shapes without changing that behavior.
+ECP-1 revises the unreleased draft `v1` contract in place. During the E0 documentation
+stage, this prose is the target authority and the runtime schema intentionally remains at
+the Phase 1 shape so the existing implementation stays regression-green. E1 updates the
+schema and implementation together.
 
 ## 2. Common request envelope
 
-Every request is a JSON object with the following fields. No additional top-level fields are permitted.
+Every request is a JSON object with no undeclared fields.
 
 | Field | Required | Meaning |
 |---|---:|---|
-| `contractVersion` | Yes | Must be `plan-line-to-span/v1`. |
-| `operation` | Yes | One of `initialize`, `createBenefit`, `updateBenefit`, `deleteBenefit`, `queryBenefit`, or `queryEmployee`. |
-| `payload` | Yes | The operation-specific object described below. |
-| `requestId` | No | Caller correlation string, 1–128 characters. It is echoed when supplied and does not provide idempotency. |
+| `contractVersion` | Yes | `plan-line-to-span/v1`. |
+| `operation` | Yes | `initialize`, `createSpan`, `updateSpan`, `deleteSpan`, `querySpan`, or `queryPlanLine`. |
+| `payload` | Yes | The operation-specific object in section 4. |
+| `requestId` | No | Caller correlation string, 1–128 characters; echoed when supplied. |
 
-All object fields not defined by the relevant schema are rejected with `MALFORMED_REQUEST`. JSON member order is not significant. Except for `formula`, all contract identifiers and dimension-value keys are strings; numbers are not coerced to strings.
+Invalid JSON, missing fields, extra fields, wrong JSON types, duplicate object members,
+unsupported versions or operations, and invalid `requestId` shape return
+`MALFORMED_REQUEST`. JSON member order is not significant and string keys are not
+coerced from other JSON types.
 
 ## 3. Shared values
 
-### 3.1 Dimension map and canonical span
+### 3.1 Dimension maps
 
-A dimension map is a JSON object whose property names are dimension identifiers and whose values are stable, non-empty dimension-value keys. A span is a dimension map in `payload.span`; an employee plan line is a dimension map in `payload.dimensions`.
+A dimension map is a JSON object whose property names are dimension identifiers and
+whose values are non-empty string value keys.
 
-The canonical form of a span is its dimension map after the utility validates all dimension identifiers and value keys. JSON member order does not affect identity. The empty object, `{}`, is the only empty-span representation and is valid. It identifies the global benefit. `{}` is also the valid empty employee plan line for a zero-dimensional model.
+- `payload.span` and `payload.replacementSpan` are spans.
+- `payload.dimensions` is a plan line.
+- `{}` is the valid empty span and the valid empty plan line for a zero-dimensional
+  model.
 
-Unknown dimensions and values are syntactically valid messages but fail semantic validation with `UNKNOWN_DIMENSION` or `UNKNOWN_DIMENSION_VALUE`. A plan line or span cannot repeat a dimension because JSON object member names are unique; a parser that accepts duplicate members must reject the request as `MALFORMED_REQUEST` rather than choosing one value.
+The caller is responsible for supplying dimensions and values that exist in the loaded
+model. The interface performs no semantic validation of them. JSON member order does not
+affect canonical span identity.
 
-### 3.2 Formula
-
-`formula` is a required, non-null JSON object. It is opaque to the utility: any JSON value is permitted within that object, including nested objects, arrays, strings, numbers, booleans, and `null`. The serialized UTF-8 value of `formula` must not exceed 65,536 bytes. A non-object, `null`, or oversized formula fails with `INVALID_FORMULA`.
-
-## 4. Operations and valid examples
+## 4. Operations and examples
 
 ### 4.1 Initialize
 
-`initialize` replaces or establishes the dimension model using `payload` as the dimension-definition object.
+`initialize` establishes or replaces the dimension model and clears stored spans.
 
 ```json
 {
@@ -65,60 +75,59 @@ Unknown dimensions and values are syntactically valid messages but fail semantic
 }
 ```
 
-### 4.2 Create benefit
+### 4.2 Create span
 
 ```json
 {
   "contractVersion": "plan-line-to-span/v1",
-  "operation": "createBenefit",
-  "payload": {
-    "span": { "location": "4" },
-    "formula": { "rate": 0.1, "enabled": true }
-  }
-}
-```
-
-### 4.3 Update benefit
-
-The supplied span selects the benefit. The formula is a complete replacement; an update cannot contain or imply a replacement span.
-
-```json
-{
-  "contractVersion": "plan-line-to-span/v1",
-  "operation": "updateBenefit",
-  "payload": {
-    "span": { "location": "4" },
-    "formula": { "rate": 0.12 }
-  }
-}
-```
-
-### 4.4 Delete benefit
-
-```json
-{
-  "contractVersion": "plan-line-to-span/v1",
-  "operation": "deleteBenefit",
+  "operation": "createSpan",
   "payload": { "span": { "location": "4" } }
 }
 ```
 
-### 4.5 Query benefit
+### 4.3 Update span
+
+`span` identifies the stored source. `replacementSpan` supplies the requested new
+identity. The operation checks state outcomes before mutation, removes the source, and
+creates the replacement.
 
 ```json
 {
   "contractVersion": "plan-line-to-span/v1",
-  "operation": "queryBenefit",
+  "operation": "updateSpan",
+  "payload": {
+    "span": { "location": "4" },
+    "replacementSpan": { "location": "20" }
+  }
+}
+```
+
+### 4.4 Delete span
+
+```json
+{
+  "contractVersion": "plan-line-to-span/v1",
+  "operation": "deleteSpan",
   "payload": { "span": { "location": "4" } }
 }
 ```
 
-### 4.6 Query employee
+### 4.5 Query span
 
 ```json
 {
   "contractVersion": "plan-line-to-span/v1",
-  "operation": "queryEmployee",
+  "operation": "querySpan",
+  "payload": { "span": { "location": "4" } }
+}
+```
+
+### 4.6 Query plan line
+
+```json
+{
+  "contractVersion": "plan-line-to-span/v1",
+  "operation": "queryPlanLine",
   "payload": {
     "dimensions": { "location": "20", "department": "rnd" }
   }
@@ -127,103 +136,106 @@ The supplied span selects the benefit. The formula is a complete replacement; an
 
 ## 5. Success responses
 
-Every success response has `ok: true`, the request's `contractVersion`, its `operation`, and a `data` object. `requestId` is included only when supplied by the caller. No additional fields are permitted.
+Every success response contains `contractVersion`, `operation`, `ok: true`, and `data`.
+`requestId` is included only when supplied. No additional fields are permitted.
 
 | Operation | `data` shape |
 |---|---|
-| `initialize` | `{ "state": "ready", "dimensionCount": 2, "benefitCount": 0 }` |
-| `createBenefit`, `updateBenefit`, `queryBenefit` | `{ "benefit": { "span": { ... }, "formula": { ... } } }` |
-| `deleteBenefit` | `{ "deleted": true, "span": { ... } }` |
-| `queryEmployee` | `{ "matches": [{ "span": { ... }, "formula": { ... } }] }` |
+| `initialize` | `{ "state": "ready", "dimensionCount": 2, "spanCount": 0 }` |
+| `createSpan`, `updateSpan`, `querySpan` | `{ "span": { ... } }` |
+| `deleteSpan` | `{ "deleted": true, "span": { ... } }` |
+| `queryPlanLine` | `{ "matches": [{ ... }, { ... }] }` |
 
-`queryEmployee` returns `{ "matches": [] }` for a valid request with no applicable benefits. Match order is not significant. A successful reinitialization always returns `benefitCount: 0` because it clears benefits atomically.
+Each `matches` element is a span dimension map, not a wrapper. No-match is successful and
+returns `{ "matches": [] }`. Match order is not significant. Successful reinitialization
+always returns `spanCount: 0`.
 
-Example successful employee query:
+Example successful plan-line query:
 
 ```json
 {
   "contractVersion": "plan-line-to-span/v1",
-  "operation": "queryEmployee",
+  "operation": "queryPlanLine",
   "ok": true,
   "data": {
     "matches": [
-      { "span": { "location": "4" }, "formula": { "rate": 0.1 } }
+      { "location": "4" },
+      { "location": "4", "department": "rnd" }
     ]
   }
 }
 ```
 
-## 6. Error responses
+## 6. State-outcome responses
 
-Every rejected request returns `ok: false` and an `error` object. The response includes the parsed operation when available and echoes `requestId` when it was validly supplied. `message` is human-readable and not stable; callers must use `error.code`.
+Declared failures contain `ok: false` and an `error` object. The parsed operation and a
+valid supplied `requestId` are included when available. `message` is human-readable and
+unstable; callers use `error.code`.
 
 ```json
 {
   "contractVersion": "plan-line-to-span/v1",
-  "operation": "createBenefit",
+  "operation": "createSpan",
   "ok": false,
   "error": {
     "code": "DUPLICATE_SPAN",
-    "message": "A benefit already exists for the supplied span."
+    "message": "A span with the supplied identity already exists."
   }
 }
 ```
 
 | Code | Category | When returned |
 |---|---|---|
-| `MALFORMED_REQUEST` | Syntax/schema | Invalid JSON, missing or extra fields, unsupported contract version or operation, wrong JSON type, duplicate object members, or an invalid `requestId`. |
-| `INVALID_DIMENSION_DEFINITION` | Validation | Invalid initialization format, duplicate identifiers or value keys, missing hierarchy parent, hierarchy cycle, or ambiguous hierarchy. |
-| `UNKNOWN_DIMENSION` | Validation | A span or plan line names a dimension absent from the loaded model. |
-| `UNKNOWN_DIMENSION_VALUE` | Validation | A span or plan line uses a value key absent from its named dimension. |
-| `INVALID_FORMULA` | Validation | `formula` is null, not an object, or exceeds 65,536 serialized UTF-8 bytes. |
-| `DUPLICATE_SPAN` | Conflict | `createBenefit` supplies a canonical span that already exists. |
-| `NOT_FOUND` | Absence | `queryBenefit`, `updateBenefit`, or `deleteBenefit` supplies a valid exact span that does not exist. |
-| `INVALID_STATE` | State | The operation is not accepted in the utility's current state, as defined in section 6.1. `error.details.state` identifies the state when available. |
-| `INDEX_FAILURE` | Internal | The utility cannot safely complete an index operation. No partial mutation is committed, and the utility remains in its current state. |
+| `MALFORMED_REQUEST` | Structural boundary | The JSON envelope cannot select and invoke a defined operation because its syntax or declared shape is invalid. |
+| `DUPLICATE_SPAN` | Stored state | `createSpan` supplies an existing identity, or `updateSpan` targets an identity occupied by a different stored span. |
+| `NOT_FOUND` | Stored state | `querySpan` or `deleteSpan` names an absent span, or `updateSpan` names an absent source. |
+| `INVALID_STATE` | Lifecycle state | The operation is not accepted in the current state. `error.details.state` identifies that state when available. |
+
+Unexpected implementation failures and semantically invalid domain data are outside the
+response contract. They may fail uncaught; there is no general internal-error envelope.
 
 ### 6.1 Operation acceptance by state
 
-`initialize` is accepted whenever the utility is not already initializing. Every other operation requires `ready`.
+`initialize` is accepted whenever initialization is not already in progress. Every other
+operation requires `ready`.
 
 | Current state | `initialize` | All other operations |
 |---|---|---|
 | `uninitialized` | Accepted | `INVALID_STATE` |
 | `initializing` | `INVALID_STATE` | `INVALID_STATE` |
 | `ready` | Accepted as reinitialization | Accepted |
-| `failed` | Accepted as a retry | `INVALID_STATE` |
+| `failed` | Accepted as retry | `INVALID_STATE` |
 
-Accepting `initialize` from `failed` is required by the operational concept's retry path. A rejected operation never changes the utility's state.
+A rejected state outcome does not mutate stored spans.
 
-Invalid examples and their expected outcomes:
+### 6.2 Stored-state precedence
 
-| Invalid request condition | Expected code |
-|---|---|
-| `{ "operation": "createBenefit" }` (missing envelope fields) | `MALFORMED_REQUEST` |
-| Create payload includes `{ "span": {}, "formula": null }` | `INVALID_FORMULA` |
-| Query span is `{ "unknown": "x" }` | `UNKNOWN_DIMENSION` |
-| Query span is `{ "location": "not-a-key" }` | `UNKNOWN_DIMENSION_VALUE` |
-| A duplicate canonical create span | `DUPLICATE_SPAN` |
-| Valid delete span absent from storage | `NOT_FOUND` |
-| Any benefit operation before initialization | `INVALID_STATE` |
-| Any benefit operation while the utility is `failed` | `INVALID_STATE` |
-| Any operation, including `initialize`, while initialization is in progress | `INVALID_STATE` |
-| Invalid hierarchy parent in initialization payload | `INVALID_DIMENSION_DEFINITION` |
+For `updateSpan`, the source identity is resolved first:
 
-## 7. Schema and validation rules
+1. absent source → `NOT_FOUND`;
+2. source present and replacement occupied by a different span → `DUPLICATE_SPAN`;
+3. otherwise replace and return the replacement.
 
-The JSON Schema is the structural contract for requests and responses. Semantic validation that depends on the loaded dimension model, duplicate-member detection, formula byte size, and current lifecycle state is performed by the utility and reported with the error codes in section 6.
+Replacing a span with the same canonical identity succeeds. All stored-state checks occur
+before removal, so a declared failure leaves the source intact.
 
-Where a condition has a dedicated semantic code, that code takes precedence over structural rejection, and the schema deliberately leaves the field unconstrained so the two cannot disagree:
+## 7. Schema and optimistic-input rules
 
-| Condition | Reported code | Not `MALFORMED_REQUEST` because |
-|---|---|---|
-| `formula` is null, a non-object, or oversized | `INVALID_FORMULA` | `formula` is structurally unconstrained in the schema. |
-| `payload.format` is an unsupported value | `INVALID_DIMENSION_DEFINITION` | `format` is typed as a string rather than a fixed constant. |
+The schema is the structural request boundary. It distinguishes the six operations and
+their payload shapes, including the two-span `updateSpan` payload. It does not verify that
+a dimension definition is coherent or that a dimension/value exists in the loaded model.
 
-`MALFORMED_REQUEST` remains correct for envelope violations, undeclared fields, wrong JSON types elsewhere, and duplicate object members.
+ECP-1 removes semantic validation and exception translation. In particular, the target
+contract has no dedicated codes for invalid dimension definitions, unknown dimensions,
+unknown values, payload content outside the concept model, or index exceptions.
 
-An implementation may enforce a transport-level JSON size limit, but it must not reinterpret a valid contract message or replace a defined contract error with an ambiguous response.
+The executable schema remains at its Phase 1 shape during E0 because it is compiled by
+the current runtime. E1 changes it atomically with the parser, dispatcher, and tests.
 
 ## 8. Compatibility
 
-The `contractVersion` value is required on every request and response. Any additive or breaking change requires a new version value and a corresponding schema. `v1` implementations reject unrecognized fields rather than silently accepting them.
+ECP-1 is a breaking replacement of the unreleased draft `v1` surface: operation names,
+update payload, success payloads, match elements, count field, and error set change. The
+contract remains `plan-line-to-span/v1` because the Phase 1 draft was never a supported
+release. After ECP-1 is implemented and released, further breaking changes require a new
+version value and corresponding schema.

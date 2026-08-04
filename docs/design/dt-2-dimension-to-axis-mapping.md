@@ -2,7 +2,7 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | Draft; awaiting technical-lead approval |
+| Status | ECP-1 revised design |
 | Design task | DT-2 of the [Preliminary Design Execution Plan](../preliminary-design-plan.md), main body |
 | Governing input | [Operational Concept](../operational-concept.md) 6.2, 9.1, 9.2, 15.2 |
 | Depends on | [DT-1](dt-1-architectural-context.md), [DT-2a](dt-2a-index-library-evaluation.md), [DT-3](dt-3-empty-span-representation.md) |
@@ -23,7 +23,7 @@ OC 9.2's hierarchical matching then becomes a pure geometric containment test, w
 
 ### 2.1 One axis per dimension
 
-Each dimension in the validated model becomes exactly one axis. Axis order is the dimension order in the dimension file, fixed at initialization. A model with `n` dimensions yields an `n`-dimensional coordinate space; `n` may be zero, per DT-3.
+Each dimension in the caller-supplied model becomes exactly one axis. Axis order is the dimension order in the dimension file, fixed at initialization. A model with `n` dimensions yields an `n`-dimensional coordinate space; `n` may be zero, per DT-3. ECP-1 assumes the model is coherent rather than validating that assumption.
 
 Non-hierarchical dimensions are the degenerate case of the same rule: every value is its own root, so each receives a disjoint interval and containment reduces to equality.
 
@@ -57,7 +57,7 @@ Read this against the fixture's hierarchy — USA `4` is the root; New York City
 
 ### 2.3 Forests
 
-A hierarchy need not be a single rooted tree. OC 14.1 rejects cycles and dangling parents, but a dimension may legitimately have several roots.
+A hierarchy need not be a single rooted tree. The caller must avoid cycles and dangling parents, but a dimension may legitimately have several roots.
 
 The traversal sweeps each root in turn on the same shared counter. Because a root's subtree is fully numbered before the next root begins, sibling root subtrees occupy disjoint ranges and cannot contain one another. No sentinel root is introduced — adding one would create a value that callers never supplied.
 
@@ -72,7 +72,7 @@ A span becomes a box with one interval per axis:
 | The span constrains this dimension | The value's own `[enter, leave]` |
 | The span omits this dimension | The whole axis |
 
-The omitted-dimension rule is DT-3's wildcard, unchanged. The empty span omits every dimension and therefore covers the entire space, which is how the global benefit is represented.
+The omitted-dimension rule is DT-3's wildcard, unchanged. The empty span omits every dimension and therefore covers the entire space, which is how the global span is represented.
 
 ### 2.5 Plan lines become query points
 
@@ -92,9 +92,9 @@ The third row is the whole design: containment means ancestor-or-self, so equali
 
 ## 3. How the two query operations differ
 
-`Query Employee` is the containment test above, evaluated by the index.
+`queryPlanLine` is the containment test above, evaluated by the index.
 
-`Query Benefit` does **not** use the geometry. It looks up the canonical span key directly, as OC 9.1 requires exact equality that hierarchy cannot broaden.
+`querySpan` does **not** use the geometry. It looks up the canonical span key directly, as OC 9.1 requires exact equality that hierarchy cannot broaden.
 
 This separation is deliberate and load-bearing. Two distinct spans can never share an interval pair, so geometry-based identity would happen to work — but it would couple exact lookup to the hierarchy encoding, and a later change to the labelling scheme could silently start broadening exact lookups. Keeping identity on the canonical key makes OC 9.1's guarantee structural rather than incidental.
 
@@ -112,7 +112,7 @@ The design plan's exit criterion requires the prototype to produce exactly the e
 
 Covering: all eleven `AC-MATCH` cases including the section 12 scenario; exactness under OC 9.1 including member-order independence; the global span and zero-dimensional interop from DT-3; the forest case; and an exhaustive check that containment agrees with ancestor-or-self across all 25 location value pairs.
 
-`AC-MATCH-10` and `AC-MATCH-11`, added during the WP-7 review, return `{B1, B2, B3}` for a New York City R&D employee and the correct sets for the three remaining section 12.2 rows.
+`AC-MATCH-10` and `AC-MATCH-11`, added during the WP-7 review, return `{S1, S2, S3}` for a New York City R&D plan line and the correct sets for the three remaining section 12 rows.
 
 ### 4.2 Differential test against an independent oracle
 
@@ -159,7 +159,7 @@ Note the limitation: this shows the geometry *supports* pruning. Whether the bui
 | DEC-21 | Non-hierarchical dimensions use the same scheme | Each value is its own root; containment degenerates to equality. No separate code path. |
 | DEC-22 | Forests are labelled by sweeping roots on a shared counter; no synthetic root | Root subtrees stay disjoint; no value is invented that callers did not supply. |
 | DEC-23 | A plan line missing a dimension fails any span constraining it | Implements OC 9.2's presence requirement geometrically. |
-| DEC-24 | `Query Benefit` uses the canonical span key, never the geometry | Makes OC 9.1's no-broadening guarantee structural rather than incidental. |
+| DEC-24 | `querySpan` uses the canonical span key, never the geometry | Makes OC 9.1's no-broadening guarantee structural rather than incidental. |
 | DEC-25 | Axis coordinates are integers bounded by twice the dimension's value count | Closes DT-1's R3 precision question. |
 
 ## 7. RISK-1 retirement

@@ -2,7 +2,7 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | Draft; awaiting technical-lead approval |
+| Status | ECP-1 amended; index decision retained |
 | Design task | DT-2 of the [Preliminary Design Execution Plan](../preliminary-design-plan.md), library-selection portion |
 | Governing input | [Operational Concept](../operational-concept.md) 9.2 and 15.2, [DT-1](dt-1-architectural-context.md) |
 | Retires | RISK-4 |
@@ -59,7 +59,7 @@ t.search({minX:1,maxX:2,minY:1,maxY:2,minZ:0,maxZ:1});
 
 `B` is disjoint from the query on the third axis and must not match. `rbush` returns it. Extra fields are carried as opaque payload and never compared.
 
-Applied to the demo, this means `Query Employee` would return benefits whose spans do not apply to the employee — a direct violation of OC 9.2 — with no error raised. The utility would silently produce wrong benefit matches. Given that OC 14.3 requires deterministic results and the entire acceptance catalogue rests on exact result sets, this option is disqualified outright.
+Applied to the demo, this means `queryPlanLine` would return spans that do not apply to the plan line — a direct violation of OC 9.2 — with no error raised. The utility would silently produce wrong matches. Since the acceptance catalogue rests on exact result sets, this option is disqualified outright.
 
 Post-filtering the results would mask the wrongness but not fix it: correctness would then depend on a linear scan over false positives, which violates OC 15.2's requirement that operations use the index rather than scanning.
 
@@ -109,7 +109,7 @@ A hand-written index is code the team owns and must test. Three mitigations are 
 
 The correctness bar is external and pre-existing: `AC-MATCH-01` through `AC-MATCH-11`, the `AC-GLOBAL-*` cases, and the `AC-ZERO-*` cases define expected result sets that the index must reproduce exactly. The DT-2 exit criterion already requires the prototype to satisfy them.
 
-DT-7 measures whether query cost grows linearly with benefit count, which is the check that catches an index that is structurally correct but has lost its pruning behavior — the most plausible way a hand-written R*-tree goes wrong quietly.
+DT-7 measures whether query cost grows linearly with span count, which is the check that catches an index that is structurally correct but has lost its pruning behavior — the most plausible way a hand-written R*-tree goes wrong quietly.
 
 The DT-1 adapter boundary means the engine depends on a domain-level index interface, so a later replacement would not disturb the component structure.
 
