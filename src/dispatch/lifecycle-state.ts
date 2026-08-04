@@ -69,14 +69,9 @@ export class LifecycleState {
    * failure (`priorState`), which the caller must pass back to
    * `completeInitialization`.
    *
-   * Throws if called when `canAccept('initialize')` is false — this is a
-   * programming-error guard, not a path `OperationDispatcher` should ever
-   * reach, since it must check the gate before calling this.
+   * The dispatcher has already applied the intake gate.
    */
   beginInitializing(): State {
-    if (!this.canAccept('initialize')) {
-      throw new Error(`cannot begin initialization from state ${this.current}`);
-    }
     const priorState = this.current;
     this.current = 'initializing';
     return priorState;
@@ -84,9 +79,6 @@ export class LifecycleState {
 
   /** Complete an initialization that `beginInitializing` started. */
   completeInitialization(priorState: State, outcome: Outcome): void {
-    if (this.current !== 'initializing') {
-      throw new Error(`completeInitialization called from state ${this.current}, expected initializing`);
-    }
     this.current = completionTransition(priorState, outcome);
   }
 }

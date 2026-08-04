@@ -3,8 +3,7 @@
  *
  * `AC-OBS-04`'s exit criterion is that leaking payload data should be
  * impossible by construction, not merely avoided by review. This builder
- * accepts only primitives from bounded sets: every field is a non-negative
- * integer, a number, or a member of an enumerated set. There is no field of
+ * accepts only typed primitives from bounded domains. There is no field of
  * unbounded string content, so a span, plan-line value, request ID,
  * or raw error message has nowhere to go -- passing one is a type error, not
  * a leak (DEC-53).
@@ -16,23 +15,11 @@
 
 const EVENT = 'plan_line_to_span.operation_completed';
 
-const OPERATIONS = new Set([
-  'initialize', 'createSpan', 'updateSpan', 'deleteSpan', 'querySpan', 'queryPlanLine',
-]);
-const OUTCOMES = new Set(['success', 'failure']);
-const ERROR_CODES = new Set([
-  'MALFORMED_REQUEST', 'INVALID_DIMENSION_DEFINITION', 'UNKNOWN_DIMENSION',
-  'UNKNOWN_DIMENSION_VALUE', 'DUPLICATE_SPAN', 'NOT_FOUND',
-  'INVALID_STATE', 'INDEX_FAILURE',
-]);
-const STATES = new Set(['uninitialized', 'initializing', 'ready', 'failed']);
-
 export type LogOperation = 'initialize' | 'createSpan' | 'updateSpan' | 'deleteSpan' | 'querySpan' | 'queryPlanLine';
 export type LogOutcome = 'success' | 'failure';
-export type LogErrorCode = 'MALFORMED_REQUEST' | 'INVALID_DIMENSION_DEFINITION' | 'UNKNOWN_DIMENSION'
-  | 'UNKNOWN_DIMENSION_VALUE' | 'DUPLICATE_SPAN' | 'NOT_FOUND' | 'INVALID_STATE' | 'INDEX_FAILURE';
+export type LogErrorCode = 'MALFORMED_REQUEST' | 'DUPLICATE_SPAN' | 'NOT_FOUND' | 'INVALID_STATE';
 export type LogState = 'uninitialized' | 'initializing' | 'ready' | 'failed';
-export type LogLevel = 'info' | 'warn' | 'error';
+export type LogLevel = 'info' | 'warn';
 
 export interface LogRecordInput {
   readonly sequence: number;
@@ -63,28 +50,12 @@ export interface LogRecord {
   readonly dimensionValueCount?: number;
 }
 
-function requireNonNegativeInteger(value: number, name: string): number {
-  if (!Number.isInteger(value) || value < 0) {
-    throw new TypeError(`${name} must be a non-negative integer`);
-  }
-  return value;
-}
-
-function requireMember<T extends string>(value: T, set: ReadonlySet<string>, name: string): T {
-  if (!set.has(value)) {
-    throw new TypeError(`${name} not in permitted set`);
-  }
-  return value;
-}
-
-/** Success is `info`; `INDEX_FAILURE` escalates to `error`; every other failure is `warn` (DEC-55). */
-function deriveLevel(outcome: LogOutcome, errorCode: LogErrorCode | undefined): LogLevel {
-  if (outcome === 'success') return 'info';
-  return errorCode === 'INDEX_FAILURE' ? 'error' : 'warn';
+function deriveLevel(outcome: LogOutcome): LogLevel {
+  return outcome === 'success' ? 'info' : 'warn';
 }
 
 /**
- * Builds one frozen log record from named, individually-validated fields.
+ * Builds one frozen log record from typed fields produced by the application.
  *
  * An unrecognized property on the input object is silently discarded rather
  * than rejected (DEC-54): TypeScript's structural typing already prevents
@@ -97,10 +68,6 @@ export function buildLogRecord(input: LogRecordInput): LogRecord {
     errorCode, matchCount, dimensionCount, dimensionValueCount,
   } = input;
 
-  if (typeof durationMs !== 'number' || !(durationMs >= 0)) {
-    throw new TypeError('durationMs must be a non-negative number');
-  }
-
   const record: {
     timestamp: string; event: 'plan_line_to_span.operation_completed'; sequence: number;
     level: LogLevel; operation: LogOperation; outcome: LogOutcome; durationMs: number;
@@ -109,22 +76,20 @@ export function buildLogRecord(input: LogRecordInput): LogRecord {
   } = {
     timestamp: new Date().toISOString(),
     event: EVENT,
-    sequence: requireNonNegativeInteger(sequence, 'sequence'),
-    level: deriveLevel(outcome, errorCode),
-    operation: requireMember(operation, OPERATIONS, 'operation'),
-    outcome: requireMember(outcome, OUTCOMES, 'outcome'),
+    sequence,
+    level: deriveLevel(outcome),
+    operation,
+    outcome,
     durationMs,
-    state: requireMember(state, STATES, 'state'),
-    spanCount: requireNonNegativeInteger(spanCount, 'spanCount'),
+    state,
+    spanCount,
   };
 
-  // Optional fields, each from a bounded domain. Omitted, never null (Obs 3).
-  if (errorCode !== undefined) record.errorCode = requireMember(errorCode, ERROR_CODES, 'errorCode');
-  if (matchCount !== undefined) record.matchCount = requireNonNegativeInteger(matchCount, 'matchCount');
-  if (dimensionCount !== undefined) record.dimensionCount = requireNonNegativeInteger(dimensionCount, 'dimensionCount');
-  if (dimensionValueCount !== undefined) {
-    record.dimensionValueCount = requireNonNegativeInteger(dimensionValueCount, 'dimensionValueCount');
-  }
+  // Optional typed fields are omitted, never null (Obs 3).
+  if (errorCode !== undefined) record.errorCode = errorCode;
+  if (matchCount !== undefined) record.matchCount = matchCount;
+  if (dimensionCount !== undefined) record.dimensionCount = dimensionCount;
+  if (dimensionValueCount !== undefined) record.dimensionValueCount = dimensionValueCount;
 
   return Object.freeze(record);
 }

@@ -4,7 +4,7 @@ import { buildDimensionModel, DIMENSION_FILE_FORMAT } from '../../src/model/dime
 import { resolveSpan, type CanonicalSpan } from '../../src/model/span.ts';
 import { RTree } from '../../src/index/rtree.ts';
 import { IndexAdapter } from '../../src/store/index-adapter.ts';
-import { SpanStore, DuplicateSpanError, SpanNotFoundError } from '../../src/store/span-store.ts';
+import { SpanStore } from '../../src/store/span-store.ts';
 
 function makeStore() {
   const model = buildDimensionModel({
@@ -19,74 +19,86 @@ function makeStore() {
 }
 
 test('create and exact use canonical span identity', () => {
-  const { model, store } = makeStore();
-  const span = resolveSpan({ location: '4' }, model);
-  assert.equal(store.create(span), span);
-  assert.equal(store.exact(span), span);
+  const { store } = makeStore();
+  const span = resolveSpan({ location: '4' });
+  assert.deepEqual(store.create(span), { ok: true, value: span });
+  assert.deepEqual(store.exact(span), { ok: true, value: span });
   assert.equal(store.count, 1);
 });
 
 test('duplicate create preserves the original', () => {
-  const { model, store } = makeStore();
-  const original = resolveSpan({ location: '4' }, model);
+  const { store } = makeStore();
+  const original = resolveSpan({ location: '4' });
   store.create(original);
-  assert.throws(() => store.create(resolveSpan({ location: '4' }, model)), DuplicateSpanError);
-  assert.equal(store.exact(original), original);
+  const duplicate = store.create(resolveSpan({ location: '4' }));
+  assert.equal(duplicate.ok, false);
+  if (!duplicate.ok) assert.equal(duplicate.code, 'DUPLICATE_SPAN');
+  assert.deepEqual(store.exact(original), { ok: true, value: original });
 });
 
 test('exact lookup remains exact across hierarchy', () => {
-  const { model, store } = makeStore();
-  store.create(resolveSpan({ location: '4' }, model));
-  assert.throws(() => store.exact(resolveSpan({ location: '20' }, model)), SpanNotFoundError);
+  const { store } = makeStore();
+  store.create(resolveSpan({ location: '4' }));
+  const result = store.exact(resolveSpan({ location: '20' }));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, 'NOT_FOUND');
 });
 
 test('update replaces the source span', () => {
-  const { model, store } = makeStore();
-  const source = resolveSpan({ location: '4' }, model);
-  const replacement = resolveSpan({ location: '20' }, model);
+  const { store } = makeStore();
+  const source = resolveSpan({ location: '4' });
+  const replacement = resolveSpan({ location: '20' });
   store.create(source);
-  assert.equal(store.update(source, replacement), replacement);
-  assert.throws(() => store.exact(source), SpanNotFoundError);
-  assert.equal(store.exact(replacement), replacement);
+  assert.deepEqual(store.update(source, replacement), { ok: true, value: replacement });
+  assert.equal(store.exact(source).ok, false);
+  assert.deepEqual(store.exact(replacement), { ok: true, value: replacement });
   assert.equal(store.count, 1);
 });
 
 test('update checks source and collision before mutation', () => {
-  const { model, store } = makeStore();
-  const source = resolveSpan({ location: '4' }, model);
-  const occupied = resolveSpan({ location: '20' }, model);
+  const { store } = makeStore();
+  const source = resolveSpan({ location: '4' });
+  const occupied = resolveSpan({ location: '20' });
   store.create(source);
   store.create(occupied);
-  assert.throws(() => store.update(resolveSpan({}, model), occupied), SpanNotFoundError);
-  assert.throws(() => store.update(source, occupied), DuplicateSpanError);
-  assert.equal(store.exact(source), source);
-  assert.equal(store.exact(occupied), occupied);
+  const missing = store.update(resolveSpan({}), occupied);
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.equal(missing.code, 'NOT_FOUND');
+  const collision = store.update(source, occupied);
+  assert.equal(collision.ok, false);
+  if (!collision.ok) assert.equal(collision.code, 'DUPLICATE_SPAN');
+  assert.deepEqual(store.exact(source), { ok: true, value: source });
+  assert.deepEqual(store.exact(occupied), { ok: true, value: occupied });
 });
 
 test('same-identity update succeeds', () => {
-  const { model, store } = makeStore();
-  const source = resolveSpan({ location: '4' }, model);
-  const equivalent = resolveSpan({ location: '4' }, model);
+  const { store } = makeStore();
+  const source = resolveSpan({ location: '4' });
+  const equivalent = resolveSpan({ location: '4' });
   store.create(source);
-  assert.equal(store.update(source, equivalent), equivalent);
+  assert.deepEqual(store.update(source, equivalent), { ok: true, value: equivalent });
   assert.equal(store.count, 1);
 });
 
 test('delete and match operate on spans directly', () => {
-  const { model, store } = makeStore();
-  const span = resolveSpan({ location: '4' }, model);
+  const { store } = makeStore();
+  const span = resolveSpan({ location: '4' });
   store.create(span);
   assert.deepEqual(store.match({ location: '20' }), [span]);
   store.delete(span);
   assert.deepEqual(store.match({ location: '20' }), []);
-  assert.throws(() => store.delete(span), SpanNotFoundError);
+  const missing = store.delete(span);
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.equal(missing.code, 'NOT_FOUND');
 });
 
 test('global span works through a zero-axis store', () => {
   const model = buildDimensionModel({ format: DIMENSION_FILE_FORMAT, dimensions: [] });
   const store = new SpanStore(new IndexAdapter(new RTree<CanonicalSpan>(0), model));
-  const global = resolveSpan({}, model);
+  const global = resolveSpan({});
   store.create(global);
   assert.deepEqual(store.match({}), [global]);
-  assert.throws(() => store.create(resolveSpan({}, model)), DuplicateSpanError);
+  const duplicate = store.create(resolveSpan({}));
+  assert.equal(duplicate.ok, false);
+  if (!duplicate.ok) assert.equal(duplicate.code, 'DUPLICATE_SPAN');
 });

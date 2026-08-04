@@ -43,7 +43,7 @@
         "format": {
           "type": "string",
           "minLength": 1,
-          "$comment": "An unsupported format value is reported as INVALID_DIMENSION_DEFINITION during E1. E2 removes semantic validation."
+          "$comment": "The structural boundary requires a string; domain meaning is caller-owned."
         },
         "dimensions": { "type": "array", "items": { "$ref": "#/$defs/dimension" } }
       }
@@ -151,7 +151,7 @@
           "required": ["code", "message"],
           "additionalProperties": false,
           "properties": {
-            "code": { "enum": ["MALFORMED_REQUEST", "INVALID_DIMENSION_DEFINITION", "UNKNOWN_DIMENSION", "UNKNOWN_DIMENSION_VALUE", "DUPLICATE_SPAN", "NOT_FOUND", "INVALID_STATE", "INDEX_FAILURE"] },
+            "code": { "enum": ["MALFORMED_REQUEST", "DUPLICATE_SPAN", "NOT_FOUND", "INVALID_STATE"] },
             "message": { "type": "string", "minLength": 1 },
             "details": { "type": "object", "additionalProperties": true }
           }

@@ -24,12 +24,11 @@ import assert from 'node:assert/strict';
 import { buildD1, buildSpanStore } from '../support/d1.ts';
 import { buildDimensionModel, DIMENSION_FILE_FORMAT } from '../../src/model/dimension-model.ts';
 import { resolveSpan } from '../../src/model/span.ts';
-import { DuplicateSpanError, SpanNotFoundError } from '../../src/store/span-store.ts';
 
 test('AC-GLOBAL-01: the global span matches a non-empty planLine plan line', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const global = resolveSpan({}, model);
+  const global = resolveSpan({});
   store.create(global);
   assert.deepEqual(store.match({ location: '20' }), [global]);
   assert.equal(store.count, 1);
@@ -38,7 +37,7 @@ test('AC-GLOBAL-01: the global span matches a non-empty planLine plan line', () 
 test('AC-GLOBAL-02: the global span matches the empty planLine plan line', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const global = resolveSpan({}, model);
+  const global = resolveSpan({});
   store.create(global);
   assert.deepEqual(store.match({}), [global]);
 });
@@ -46,28 +45,30 @@ test('AC-GLOBAL-02: the global span matches the empty planLine plan line', () =>
 test('AC-GLOBAL-03: a duplicate global create is rejected; the original remains', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const global = resolveSpan({}, model);
+  const global = resolveSpan({});
   store.create(global);
-  assert.throws(() => store.create(resolveSpan({}, model)), DuplicateSpanError);
-  assert.equal(store.exact(global), global);
+  assert.deepEqual(store.create(resolveSpan({})), {
+    ok: false, code: 'DUPLICATE_SPAN', message: 'a span with this identity already exists',
+  });
+  assert.deepEqual(store.exact(global), { ok: true, value: global });
   assert.equal(store.count, 1);
 });
 
 test('AC-GLOBAL-04: exact query, update, exact query again, delete, then not found', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const global = resolveSpan({}, model);
+  const global = resolveSpan({});
 
   store.create(global);
-  assert.equal(store.exact(global), global);
+  assert.deepEqual(store.exact(global), { ok: true, value: global });
 
-  const replacement = resolveSpan({}, model);
+  const replacement = resolveSpan({});
   store.update(global, replacement);
-  assert.equal(store.exact(replacement), replacement);
+  assert.deepEqual(store.exact(replacement), { ok: true, value: replacement });
 
   store.delete(global);
   assert.equal(store.count, 0);
-  assert.throws(() => store.exact(global), SpanNotFoundError);
+  assert.equal(store.exact(global).ok, false);
 });
 
 test('AC-ZERO-01: a zero-dimensional model accepts the global span and matches the empty plan line', () => {
@@ -75,7 +76,7 @@ test('AC-ZERO-01: a zero-dimensional model accepts the global span and matches t
   assert.equal(model.dimensionCount, 0);
   const store = buildSpanStore(model);
 
-  const global = resolveSpan({}, model);
+  const global = resolveSpan({});
   store.create(global);
   assert.deepEqual(store.match({}), [global]);
   assert.equal(store.count, 1);
@@ -87,21 +88,23 @@ test('AC-ZERO-01: a zero-dimensional model accepts the global span and matches t
 test('the global span coexists with an ordinary span and both are independently addressable', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const global = resolveSpan({}, model);
-  const usa = resolveSpan({ location: '4' }, model);
+  const global = resolveSpan({});
+  const usa = resolveSpan({ location: '4' });
 
   store.create(global);
   store.create(usa);
 
   assert.equal(store.count, 2);
   assert.deepEqual(store.match({ location: '4' }).map(span => span.key).sort(), [global.key, usa.key].sort());
-  assert.equal(store.exact(global), global);
-  assert.equal(store.exact(usa), usa);
+  assert.deepEqual(store.exact(global), { ok: true, value: global });
+  assert.deepEqual(store.exact(usa), { ok: true, value: usa });
 });
 
 test('exact lookup for a non-empty span never returns the global span (OC 9.1 applies to it too)', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  store.create(resolveSpan({}, model));
-  assert.throws(() => store.exact(resolveSpan({ location: '4' }, model)), SpanNotFoundError);
+  store.create(resolveSpan({}));
+  const result = store.exact(resolveSpan({ location: '4' }));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, 'NOT_FOUND');
 });

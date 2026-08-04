@@ -1,8 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildDimensionModel, InvalidDimensionDefinitionError,
-  DIMENSION_FILE_FORMAT, type DimensionFile,
+  buildDimensionModel, DIMENSION_FILE_FORMAT, type DimensionFile,
 } from '../../src/model/dimension-model.ts';
 import { contains } from '../../src/index/box.ts';
 
@@ -29,93 +28,6 @@ const D1: DimensionFile = {
   ],
 };
 
-test('rejects an unsupported format', () => {
-  assert.throws(
-    () => buildDimensionModel({ format: 'wrong/v1', dimensions: [] }),
-    InvalidDimensionDefinitionError,
-  );
-});
-
-test('rejects a missing format', () => {
-  assert.throws(
-    () => buildDimensionModel({ format: '', dimensions: [] }),
-    InvalidDimensionDefinitionError,
-  );
-});
-
-test('rejects duplicate dimension identifiers', () => {
-  const file: DimensionFile = {
-    format: DIMENSION_FILE_FORMAT,
-    dimensions: [
-      { id: 'location', name: 'A', values: [] },
-      { id: 'location', name: 'B', values: [] },
-    ],
-  };
-  assert.throws(() => buildDimensionModel(file), InvalidDimensionDefinitionError);
-});
-
-test('rejects duplicate value keys within a dimension', () => {
-  const file: DimensionFile = {
-    format: DIMENSION_FILE_FORMAT,
-    dimensions: [{
-      id: 'location', name: 'L',
-      values: [{ key: '4', name: 'USA' }, { key: '4', name: 'Also USA' }],
-    }],
-  };
-  assert.throws(() => buildDimensionModel(file), InvalidDimensionDefinitionError);
-});
-
-test('rejects a parentKey that does not identify a value in the same dimension', () => {
-  const file: DimensionFile = {
-    format: DIMENSION_FILE_FORMAT,
-    dimensions: [{
-      id: 'location', name: 'L',
-      values: [{ key: '20', name: 'NYC', parentKey: '999' }],
-    }],
-  };
-  assert.throws(() => buildDimensionModel(file), InvalidDimensionDefinitionError);
-});
-
-test('rejects a two-value cycle', () => {
-  const file: DimensionFile = {
-    format: DIMENSION_FILE_FORMAT,
-    dimensions: [{
-      id: 'location', name: 'L',
-      values: [
-        { key: 'a', name: 'A', parentKey: 'b' },
-        { key: 'b', name: 'B', parentKey: 'a' },
-      ],
-    }],
-  };
-  assert.throws(() => buildDimensionModel(file), InvalidDimensionDefinitionError);
-});
-
-test('rejects a self-referential cycle', () => {
-  const file: DimensionFile = {
-    format: DIMENSION_FILE_FORMAT,
-    dimensions: [{
-      id: 'location', name: 'L',
-      values: [{ key: 'a', name: 'A', parentKey: 'a' }],
-    }],
-  };
-  assert.throws(() => buildDimensionModel(file), InvalidDimensionDefinitionError);
-});
-
-test('rejects a longer cycle', () => {
-  const file: DimensionFile = {
-    format: DIMENSION_FILE_FORMAT,
-    dimensions: [{
-      id: 'location', name: 'L',
-      values: [
-        { key: 'a', name: 'A', parentKey: 'c' },
-        { key: 'b', name: 'B', parentKey: 'a' },
-        { key: 'c', name: 'C', parentKey: 'b' },
-      ],
-    }],
-  };
-  assert.throws(() => buildDimensionModel(file), InvalidDimensionDefinitionError);
-});
-
 test('a zero-dimensional model is valid', () => {
   const model = buildDimensionModel({ format: DIMENSION_FILE_FORMAT, dimensions: [] });
   assert.equal(model.axisCount, 0);
@@ -129,15 +41,6 @@ test('reports dimension and value counts (Obs 4)', () => {
   const model = buildDimensionModel(D1);
   assert.equal(model.dimensionCount, 2);
   assert.equal(model.dimensionValueCount, 7);
-});
-
-test('hasDimension and hasValue reflect the loaded model', () => {
-  const model = buildDimensionModel(D1);
-  assert.equal(model.hasDimension('location'), true);
-  assert.equal(model.hasDimension('nonexistent'), false);
-  assert.equal(model.hasValue('location', '4'), true);
-  assert.equal(model.hasValue('location', 'not-a-key'), false);
-  assert.equal(model.hasValue('nonexistent', '4'), false);
 });
 
 // ---- interval containment: the property the whole design rests on ----
@@ -196,8 +99,7 @@ test('every value with no parentKey is a root, including an entire non-hierarchi
   // department has two values, neither declares a parentKey: two single-node
   // roots, which is the common case rather than a special one (DEC-21).
   const model = buildDimensionModel(D1);
-  assert.equal(model.hasValue('department', 'rnd'), true);
-  assert.equal(model.hasValue('department', 'eng'), true);
+  assert.notDeepEqual(model.spanToBox({ department: 'rnd' }), model.spanToBox({ department: 'eng' }));
 });
 
 test('a partly hierarchical dimension can have an unrelated standalone value', () => {
@@ -251,22 +153,4 @@ test('the empty plan line satisfies only the empty span', () => {
   assert.equal(contains(model.spanToBox({}), point), true, 'the global span matches everything');
   assert.equal(contains(model.spanToBox({ location: '4' }), point), false,
     'a span constraining location cannot be satisfied by a plan line with no location');
-});
-
-// ---- error paths in span/plan-line resolution ----
-
-test('spanToBox throws on an unknown dimension', () => {
-  const model = buildDimensionModel(D1);
-  assert.throws(() => model.spanToBox({ unknown: 'x' }));
-});
-
-test('spanToBox throws on an unknown value', () => {
-  const model = buildDimensionModel(D1);
-  assert.throws(() => model.spanToBox({ location: 'not-a-key' }));
-});
-
-test('planLineToPoint throws on an unknown dimension or value', () => {
-  const model = buildDimensionModel(D1);
-  assert.throws(() => model.planLineToPoint({ unknown: 'x' }));
-  assert.throws(() => model.planLineToPoint({ location: 'not-a-key' }));
 });

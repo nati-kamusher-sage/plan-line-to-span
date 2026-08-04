@@ -23,7 +23,7 @@ function keysOf(store: SpanStore, planLine: Readonly<Record<string, string>>): s
 test('AC-MATCH-01: direct equality matches', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const span = resolveSpan({ location: '20' }, model);
+  const span = resolveSpan({ location: '20' });
   store.create(span);
   assert.deepEqual(keysOf(store, { location: '20' }), [span.key]);
 });
@@ -31,7 +31,7 @@ test('AC-MATCH-01: direct equality matches', () => {
 test('AC-MATCH-02: one-level ancestor match', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const span = resolveSpan({ location: '4' }, model);
+  const span = resolveSpan({ location: '4' });
   store.create(span);
   assert.deepEqual(keysOf(store, { location: '20' }), [span.key]);
 });
@@ -39,7 +39,7 @@ test('AC-MATCH-02: one-level ancestor match', () => {
 test('AC-MATCH-03: multi-level ancestor match across two levels, 4 -> 20 -> 22', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const span = resolveSpan({ location: '4' }, model);
+  const span = resolveSpan({ location: '4' });
   store.create(span);
   assert.deepEqual(keysOf(store, { location: '22' }), [span.key]);
 });
@@ -47,14 +47,14 @@ test('AC-MATCH-03: multi-level ancestor match across two levels, 4 -> 20 -> 22',
 test('AC-MATCH-04: a child span does not match a parent planLine', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  store.create(resolveSpan({ location: '22' }, model));
+  store.create(resolveSpan({ location: '22' }));
   assert.deepEqual(keysOf(store, { location: '4' }), []);
 });
 
 test('AC-MATCH-05: an planLine-only dimension does not prevent a match', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const span = resolveSpan({ location: '4' }, model);
+  const span = resolveSpan({ location: '4' });
   store.create(span);
   assert.deepEqual(keysOf(store, { location: '20', department: 'rnd' }), [span.key]);
 });
@@ -62,29 +62,29 @@ test('AC-MATCH-05: an planLine-only dimension does not prevent a match', () => {
 test('AC-MATCH-06: a missing required planLine dimension prevents a match', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  store.create(resolveSpan({ location: '4', department: 'rnd' }, model));
+  store.create(resolveSpan({ location: '4', department: 'rnd' }));
   assert.deepEqual(keysOf(store, { location: '20' }), []);
 });
 
 test('AC-MATCH-07: span constraints use AND semantics', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  store.create(resolveSpan({ location: '4', department: 'rnd' }, model));
+  store.create(resolveSpan({ location: '4', department: 'rnd' }));
   assert.deepEqual(keysOf(store, { location: '20', department: 'eng' }), []);
 });
 
 test('AC-MATCH-08: a valid query with no applicable spans returns an empty collection', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  store.create(resolveSpan({ location: '21' }, model)); // Los Angeles
+  store.create(resolveSpan({ location: '21' })); // Los Angeles
   assert.deepEqual(keysOf(store, { location: '20' }), []); // New York City
 });
 
 test('AC-MATCH-09: repeated queries return the same set; ordering is not asserted', () => {
   const model = buildD1();
   const store = buildSpanStore(model);
-  const broad = resolveSpan({ location: '4' }, model);
-  const narrow = resolveSpan({ location: '20' }, model);
+  const broad = resolveSpan({ location: '4' });
+  const narrow = resolveSpan({ location: '20' });
   store.create(broad);
   store.create(narrow);
   const first = keysOf(store, { location: '22' });
@@ -98,10 +98,10 @@ test('AC-MATCH-09: repeated queries return the same set; ordering is not asserte
 function section12Store(): { model: ReturnType<typeof buildD1>; store: SpanStore } {
   const model = buildD1();
   const store = buildSpanStore(model);
-  store.create(resolveSpan({ location: '4' }, model));
-  store.create(resolveSpan({ location: '4', department: 'rnd' }, model));
-  store.create(resolveSpan({ location: '20' }, model));
-  store.create(resolveSpan({ location: '4', department: 'eng' }, model));
+  store.create(resolveSpan({ location: '4' }));
+  store.create(resolveSpan({ location: '4', department: 'rnd' }));
+  store.create(resolveSpan({ location: '20' }));
+  store.create(resolveSpan({ location: '4', department: 'eng' }));
   return { model, store };
 }
 
