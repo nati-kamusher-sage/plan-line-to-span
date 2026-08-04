@@ -229,10 +229,14 @@ The `inject-index-failure` seam at `IndexAdapter` (DEC-62, DEC-63).
 
 ### T12 — performance harness
 
+**Status: Complete.** Merged as [#14](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/14); see [t12-performance-harness.md](pull-requests/t12-performance-harness.md).
+
 Wire the comparison counter and run the DT-7 volumes (DEC-45 to DEC-51).
 
 **Resolves:** **ISSUE-D1.** This is the task that closes the one design-phase item that could not be closed before code.
 **Gate:** if the pass condition fails, the index is at fault, not the threshold. Investigate T1, do not relax DEC-48.
+
+**Outcome:** 189 tests pass; `npm run performance` (not part of the default test run, per DT-7's placement) shows every real volume sublinear at 8N (ratios 1.13–2.69, all well under the 4x threshold) and the naive-scan control at exactly 8.0x, confirming no pruning. Building the volume fixtures surfaced an inconsistency in DT-7's own V1 numbers (10 benefits is unreachable from 1 dimension/5 values given the duplicate-span prohibition) and required a synthetic uniqueness dimension once the 8N requirement made per-dimension-only uniqueness infeasible for V1 and V4 simultaneously. Mutation comparisons (create/update/delete) are a documented, deliberate gap — their cost drivers are structurally different from the search path and would require touching `RTree`'s actual algorithm internals rather than adding a parallel method.
 
 ### T13 — frontend
 
