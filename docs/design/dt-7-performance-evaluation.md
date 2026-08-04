@@ -2,7 +2,7 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | ECP-1 revised measurement design |
+| Status | Implemented and re-measured after ECP-1 |
 | Design task | DT-7 of the [Preliminary Design Execution Plan](../preliminary-design-plan.md) |
 | Governing input | [Operational Concept](../operational-concept.md) 15.2, 16.2 |
 | Depends on | [DT-2](dt-2-dimension-to-axis-mapping.md), [DT-3](dt-3-empty-span-representation.md) |
@@ -86,7 +86,10 @@ For each volume, and for `queryPlanLine` and `querySpan`:
 
 Linear behavior produces a factor of 8. The threshold at 4 leaves room for the genuine growth an R*-tree exhibits — tree depth increases with size, and overlapping boxes force multi-branch descent — while still failing anything proportional to N.
 
-Mutations are measured the same way. Create, update, and delete each locate a position before acting, and OC 15.2 covers them explicitly.
+The current harness measures the two query paths. Create, update, and delete have
+different cost drivers inside the tree and remain a documented measurement gap; adding
+meaningful counters for them requires algorithm-level instrumentation rather than
+pretending a query count measures mutation work.
 
 **On failure the design is at fault, not the threshold.** If a real index fails this, the response is to investigate the index, not to relax the number. The threshold is documented here so that moving it requires an explicit, visible change.
 
@@ -104,17 +107,46 @@ The harness sits alongside the differential test from DT-2a's DEC-13, which alre
 
 The counter must not be compiled into the production path. DT-1's minimal-dependency principle and the privacy rules both argue against instrumentation that is live by default.
 
-## 8. RISK-3 retirement
+## 8. Implementation measurements
+
+T12 first ran the harness against the Phase 1 implementation. ECP-1 E3 reran the same
+four volumes, seed (`20260804`), operations, and threshold after formulas, benefits,
+employees, and semantic guard paths were removed. The comparison counts are shown side
+by side:
+
+| Volume | Operation | Phase 1 N | Phase 1 8N | Phase 1 ratio | ECP-1 N | ECP-1 8N | ECP-1 ratio |
+|---|---|---:|---:|---:|---:|---:|---:|
+| V1 minimal | `queryPlanLine` | 13 | 35 | 2.69 | 13 | 35 | 2.69 |
+| V1 minimal | `querySpan` | 13 | 35 | 2.69 | 13 | 35 | 2.69 |
+| V2 nominal | `queryPlanLine` | 29 | 62 | 2.14 | 29 | 62 | 2.14 |
+| V2 nominal | `querySpan` | 29 | 62 | 2.14 | 29 | 62 | 2.14 |
+| V3 wide | `queryPlanLine` | 44 | 54 | 1.23 | 44 | 54 | 1.23 |
+| V3 wide | `querySpan` | 44 | 54 | 1.23 | 44 | 54 | 1.23 |
+| V4 deep | `queryPlanLine` | 45 | 51 | 1.13 | 45 | 51 | 1.13 |
+| V4 deep | `querySpan` | 45 | 51 | 1.13 | 45 | 51 | 1.13 |
+
+Every real volume/operation pair remains below the `< 4` pass threshold. The V2 naive
+linear-scan control again measured 500 comparisons at N and 4,000 at 8N, a ratio of
+8.00, and correctly failed the threshold.
+
+The identical before/after counts are expected evidence, not a missing effect: the
+metric counts R\*-tree box comparisons. ECP-1 reduced the stored value and removed work
+outside tree traversal, but did not change span geometry, tree construction, or the
+search algorithm. This measurement establishes that the reductions caused no pruning
+regression; it does not claim that comparison counts measure payload size or total
+operation latency.
+
+## 9. RISK-3 retirement
 
 RISK-3 was that no volume, latency, or memory targets exist, making OC 15.2 unmeasurable and leaving no way to detect an accidentally linear design.
 
-The risk is retired as a *design* matter: volumes are defined, the metric is chosen and validated against known-linear and known-sublinear implementations, the pass condition is explicit, and the harness has a control that fails by construction.
-
-The qualification is important and is not a technicality. **No real index has been measured, because none exists yet.** DT-7 delivers the approach the plan asked for. The first execution against the built R*-tree belongs to implementation, and until then the OC 15.2 claim is designed-for rather than demonstrated. This is the one exit criterion in the design phase that cannot be fully closed before code exists.
+The risk is retired: volumes are defined, the metric is validated against known-linear
+and known-sublinear implementations, the pass condition is explicit, the control fails
+by construction, and both T12 and ECP-1 E3 measured the built R\*-tree successfully.
 
 Memory is not measured. OC 16.2 mentions it, but at these volumes any measurement would be dominated by runtime overhead rather than the index, and no target exists to compare against. Recorded as a deliberate omission rather than an oversight.
 
-## 9. Decisions recorded
+## 10. Decisions recorded
 
 | ID | Decision | Rationale |
 |---|---|---|
@@ -126,10 +158,8 @@ Memory is not measured. OC 16.2 mentions it, but at these volumes any measuremen
 | DEC-50 | No numeric latency or memory target | OC 15.2 states none, and OC 16.2 forbids implying production targets. |
 | DEC-51 | The comparison counter is harness-only, not in the production path | Instrumentation should not be live by default. |
 
-## 10. Open items
+## 11. Open items
 
 | Item | Owner task |
 |---|---|
-| First execution against the real index | Implementation |
-| Wiring the counter into `IndexAdapter` | Implementation |
-| Sharing fixture generators with the DEC-13 differential test | DT-9 |
+| Mutation-path comparison instrumentation | Future performance work |
