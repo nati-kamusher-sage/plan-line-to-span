@@ -405,5 +405,6 @@ cases retired by ECP-1.
 
 The T1–T13 sections and recorded outcomes remain unchanged because they describe what was
 actually built and tested in Phase 1. E0–E3 are the authoritative forward sequence;
-readers must not treat historical Phase 1 operation names, payload shapes, or cumulative
+E0–E2 are merged and E3 contains the final measurement and catalogue reconciliation.
+Readers must not treat historical Phase 1 operation names, payload shapes, or cumulative
 case counts as the target contract.

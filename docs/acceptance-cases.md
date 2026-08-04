@@ -3,7 +3,7 @@
 | Catalog attribute | Value |
 |---|---|
 | Version | ECP-1 target for `v1` |
-| Status | 39 active, 9 retired; implementation follows in E1/E2 |
+| Status | ECP-1 implemented: 39 active, 9 retired |
 | Governing behavior | [Operational Concept](operational-concept.md) |
 | Interface messages | [Interface Contract](interface-contract.md) |
 | Observable output | [Observability Contract](observability-contract.md) |
@@ -119,5 +119,5 @@ empty/zero-dimensional cases, 3 structural/serial cases, and 4 observability cas
 Active cases cover every declared ECP-1 state outcome, all state/operation gates, span
 replacement precedence, exact identity, hierarchical matching, global and
 zero-dimensional behavior, the structural request boundary, serial processing, and every
-required log field. E1 and E2 rename or retire implementation tests to match this target;
-until then, the Phase 1 regression suite remains the gate for E0.
+required log field. The implementation tests use the active identifiers, and the coverage
+checker assigns all 39 active cases and all 9 retired lineages exactly once.

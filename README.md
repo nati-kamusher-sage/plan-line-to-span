@@ -1,17 +1,17 @@
 # Plan Line to Span
 
-A demo utility that resolves employee plan lines to the benefit definitions that apply to them, using an n-dimensional R\*-tree for dimension-aware matching.
+A demo utility that finds the stored spans that apply to a plan line, using an n-dimensional R\*-tree for dimension-aware matching.
 
 ## The problem
 
-In an xP&A budget grid, each employee is a plan line carrying dimension values such as location and department. Benefits are defined against *spans* — sets of dimension constraints — rather than against individual employees. A benefit for `{location: USA}` applies to everyone in the USA, including everyone in New York City, because the dimension hierarchy makes New York City a descendant of USA.
+In an xP&A budget grid, a plan line carries dimension values such as location and department. Stored *spans* describe sets of plan lines by constraining any subset of those dimensions. A span `{location: USA}` applies to a plan line in New York City because the dimension hierarchy makes New York City a descendant of USA.
 
 The utility answers two questions:
 
-- **`Query Employee`** — given a plan line, which benefits apply? Uses subset matching with hierarchical ancestry.
-- **`Query Benefit`** — given an exact span, which benefit is stored there? Exact equality; hierarchy does not broaden it.
+- **`queryPlanLine`** — given a plan line, which stored spans apply? Uses subset matching with hierarchical ancestry.
+- **`querySpan`** — is this exact span stored? Exact equality; hierarchy does not broaden it.
 
-A benefit may apply to many employees and an employee may receive many benefits. The relationship is derived at query time from the dimension model rather than maintained as links.
+The full interface is `initialize`, `createSpan`, `updateSpan`, `deleteSpan`, `querySpan`, and `queryPlanLine`. `updateSpan` replaces one identified span with another.
 
 ## How matching works
 
@@ -24,21 +24,24 @@ location    4:[0,9]   20:[1,6]   22:[2,3]   30:[4,5]   21:[7,8]
 
 `4:[0,9]` contains everything, so USA is an ancestor of all. `20:[1,6]` contains Manhattan and Brooklyn but not Los Angeles `[7,8]`.
 
-A span omitting a dimension covers that whole axis. The empty span therefore covers every axis at once, which is how the global benefit works without a special case.
+A span omitting a dimension covers that whole axis. The empty span therefore covers every axis at once, which is how a global span works without a special case.
 
 ## Status
 
-Requirements elicitation and preliminary design are complete and approved. Implementation is in progress.
+Requirements, design, and the ECP-1 span-only implementation are complete. ECP-1 retains 39 active acceptance cases and nine retired Phase 1 lineages.
 
 | Phase | State |
 |---|---|
-| Requirements baseline | Approved. 48 acceptance cases. |
+| Requirements baseline | Approved, then revised by ECP-1. 39 active cases; 9 retired lineages. |
 | Preliminary design | Approved. 65 recorded decisions, 14 executable prototypes. |
-| Implementation | In progress. 13 tasks; see the implementation plan. |
+| Phase 1 implementation | Complete. 13 tasks; retained as historical evidence. |
+| ECP-1 implementation | Complete through E2; E3 measurement and reconciliation in review. |
 
 ## Approach
 
 The project is documentation-led. Behavior was settled and reviewed before code was written, and the design records are the specification that implementation follows.
+
+The current contract is intentionally optimistic. JSON shape is enforced at the request boundary, and lifecycle plus stored-state outcomes (`DUPLICATE_SPAN`, `NOT_FOUND`, and `INVALID_STATE`) remain explicit. Domain values and hierarchy semantics are assumed valid; semantic validation and exception translation are outside the contract.
 
 Two habits carried through every phase and are worth naming, because they caught real defects:
 
@@ -63,9 +66,11 @@ Requires Node 24 or later, which strips TypeScript natively — there is no buil
 npm install
 npm test          # type-check, then the full suite
 npm run prototypes # the design-phase evidence
+npm run performance # deterministic DT-7 growth measurement
+node docs/implementation/task-coverage-check.mjs # 39 active + 9 retired
 ```
 
-The project has no runtime dependencies.
+The service reads JSON Lines on standard input and writes responses on standard output with `npm start`.
 
 ## Licence and attribution
 
