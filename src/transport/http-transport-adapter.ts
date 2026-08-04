@@ -16,7 +16,7 @@
  * missing endpoint, an unreadable body, a non-POST method -- which is
  * transport failure, not a `Response` the core ever produced.
  *
- * This class does not import or reference `BenefitStore`, `DimensionModel`,
+ * This class does not import or reference `SpanStore`, `DimensionModel`,
  * or any domain type. It reads bytes, calls one method, writes bytes.
  */
 

@@ -1,8 +1,8 @@
 /**
  * Canonical span identity.
  *
- * OC 6.6: a span is a benefit's unique identifier, and two benefits cannot
- * share a canonical span. OC 9.1 and the AC-BEN-04 case require that member
+ * A span is the complete stored object and its unique identifier. OC 9.1 and
+ * the AC-SPAN-04 case require that member
  * order not affect identity. DEC-24 requires that identity never depend on
  * geometry, so that a later change to the interval-labelling scheme cannot
  * silently broaden or narrow exact lookup — see DT-2 section 3.
@@ -73,7 +73,7 @@ export class CanonicalSpan {
 /**
  * The canonical key: dimension-value pairs sorted by dimension id, so that
  * `{location: 4, department: rnd}` and `{department: rnd, location: 4}`
- * produce the same key (AC-BEN-04).
+ * produce the same key (AC-SPAN-04).
  */
 function canonicalKey(dimensions: Readonly<Record<string, string>>): string {
   const sorted = Object.keys(dimensions).sort();

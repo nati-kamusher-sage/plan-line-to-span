@@ -14,7 +14,7 @@ import type { Operation } from './lifecycle-state.ts';
 
 export const ERROR_CODES = [
   'MALFORMED_REQUEST', 'INVALID_DIMENSION_DEFINITION', 'UNKNOWN_DIMENSION',
-  'UNKNOWN_DIMENSION_VALUE', 'INVALID_FORMULA', 'DUPLICATE_SPAN', 'NOT_FOUND',
+  'UNKNOWN_DIMENSION_VALUE', 'DUPLICATE_SPAN', 'NOT_FOUND',
   'INVALID_STATE', 'INDEX_FAILURE',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

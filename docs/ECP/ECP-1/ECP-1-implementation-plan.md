@@ -2,7 +2,7 @@
 
 | Document attribute | Value |
 |---|---|
-| Status | E0 implemented on `ecp-1-e0-specification`; review and merge pending |
+| Status | E0 merged; E1 implemented on `ecp-1-e1-spans-only`; review and merge pending |
 | Purpose | Apply the two ECP-1 architectural changes to the engineering specification and the code |
 | Governing input | [ECP-1](ECP-1.md), as clarified 2026-08-04 |
 | Predecessor | [Implementation Execution Plan](../../implementation-plan.md), Phase 1 complete (T1–T13, T8 skipped) |

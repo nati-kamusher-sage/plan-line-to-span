@@ -15,18 +15,6 @@
       "propertyNames": { "type": "string", "minLength": 1 },
       "additionalProperties": { "type": "string", "minLength": 1 }
     },
-    "formula": {
-      "$comment": "Structurally unconstrained so that a non-object, null, or oversized formula is reported as the semantic code INVALID_FORMULA rather than MALFORMED_REQUEST. See interface contract sections 3.2 and 7."
-    },
-    "benefit": {
-      "type": "object",
-      "required": ["span", "formula"],
-      "additionalProperties": false,
-      "properties": {
-        "span": { "$ref": "#/$defs/dimensionMap" },
-        "formula": { "$ref": "#/$defs/formula" }
-      }
-    },
     "dimensionValue": {
       "type": "object",
       "required": ["key", "name"],
@@ -55,18 +43,9 @@
         "format": {
           "type": "string",
           "minLength": 1,
-          "$comment": "An unsupported format value is reported as the semantic code INVALID_DIMENSION_DEFINITION rather than MALFORMED_REQUEST. See interface contract sections 6 and 7."
+          "$comment": "An unsupported format value is reported as INVALID_DIMENSION_DEFINITION during E1. E2 removes semantic validation."
         },
         "dimensions": { "type": "array", "items": { "$ref": "#/$defs/dimension" } }
-      }
-    },
-    "createOrUpdatePayload": {
-      "type": "object",
-      "required": ["span", "formula"],
-      "additionalProperties": false,
-      "properties": {
-        "span": { "$ref": "#/$defs/dimensionMap" },
-        "formula": { "$ref": "#/$defs/formula" }
       }
     },
     "spanPayload": {
@@ -75,7 +54,16 @@
       "additionalProperties": false,
       "properties": { "span": { "$ref": "#/$defs/dimensionMap" } }
     },
-    "employeePayload": {
+    "updateSpanPayload": {
+      "type": "object",
+      "required": ["span", "replacementSpan"],
+      "additionalProperties": false,
+      "properties": {
+        "span": { "$ref": "#/$defs/dimensionMap" },
+        "replacementSpan": { "$ref": "#/$defs/dimensionMap" }
+      }
+    },
+    "planLinePayload": {
       "type": "object",
       "required": ["dimensions"],
       "additionalProperties": false,
@@ -83,19 +71,19 @@
     },
     "initializeData": {
       "type": "object",
-      "required": ["state", "dimensionCount", "benefitCount"],
+      "required": ["state", "dimensionCount", "spanCount"],
       "additionalProperties": false,
       "properties": {
         "state": { "const": "ready" },
         "dimensionCount": { "type": "integer", "minimum": 0 },
-        "benefitCount": { "const": 0 }
+        "spanCount": { "const": 0 }
       }
     },
-    "benefitData": {
+    "spanData": {
       "type": "object",
-      "required": ["benefit"],
+      "required": ["span"],
       "additionalProperties": false,
-      "properties": { "benefit": { "$ref": "#/$defs/benefit" } }
+      "properties": { "span": { "$ref": "#/$defs/dimensionMap" } }
     },
     "deleteData": {
       "type": "object",
@@ -106,12 +94,12 @@
         "span": { "$ref": "#/$defs/dimensionMap" }
       }
     },
-    "employeeData": {
+    "planLineData": {
       "type": "object",
       "required": ["matches"],
       "additionalProperties": false,
       "properties": {
-        "matches": { "type": "array", "items": { "$ref": "#/$defs/benefit" } }
+        "matches": { "type": "array", "items": { "$ref": "#/$defs/dimensionMap" } }
       }
     },
     "request": {
@@ -120,15 +108,15 @@
       "additionalProperties": false,
       "properties": {
         "contractVersion": { "$ref": "#/$defs/version" },
-        "operation": { "enum": ["initialize", "createBenefit", "updateBenefit", "deleteBenefit", "queryBenefit", "queryEmployee"] },
+        "operation": { "enum": ["initialize", "createSpan", "updateSpan", "deleteSpan", "querySpan", "queryPlanLine"] },
         "requestId": { "$ref": "#/$defs/requestId" },
         "payload": { "type": "object" }
       },
       "allOf": [
         { "if": { "properties": { "operation": { "const": "initialize" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/dimensionDefinition" } } } },
-        { "if": { "properties": { "operation": { "enum": ["createBenefit", "updateBenefit"] } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/createOrUpdatePayload" } } } },
-        { "if": { "properties": { "operation": { "enum": ["deleteBenefit", "queryBenefit"] } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/spanPayload" } } } },
-        { "if": { "properties": { "operation": { "const": "queryEmployee" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/employeePayload" } } } }
+        { "if": { "properties": { "operation": { "enum": ["createSpan", "deleteSpan", "querySpan"] } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/spanPayload" } } } },
+        { "if": { "properties": { "operation": { "const": "updateSpan" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/updateSpanPayload" } } } },
+        { "if": { "properties": { "operation": { "const": "queryPlanLine" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/planLinePayload" } } } }
       ]
     },
     "successResponse": {
@@ -137,16 +125,16 @@
       "additionalProperties": false,
       "properties": {
         "contractVersion": { "$ref": "#/$defs/version" },
-        "operation": { "enum": ["initialize", "createBenefit", "updateBenefit", "deleteBenefit", "queryBenefit", "queryEmployee"] },
+        "operation": { "enum": ["initialize", "createSpan", "updateSpan", "deleteSpan", "querySpan", "queryPlanLine"] },
         "requestId": { "$ref": "#/$defs/requestId" },
         "ok": { "const": true },
         "data": { "type": "object" }
       },
       "allOf": [
         { "if": { "properties": { "operation": { "const": "initialize" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/initializeData" } } } },
-        { "if": { "properties": { "operation": { "enum": ["createBenefit", "updateBenefit", "queryBenefit"] } } }, "then": { "properties": { "data": { "$ref": "#/$defs/benefitData" } } } },
-        { "if": { "properties": { "operation": { "const": "deleteBenefit" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/deleteData" } } } },
-        { "if": { "properties": { "operation": { "const": "queryEmployee" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/employeeData" } } } }
+        { "if": { "properties": { "operation": { "enum": ["createSpan", "updateSpan", "querySpan"] } } }, "then": { "properties": { "data": { "$ref": "#/$defs/spanData" } } } },
+        { "if": { "properties": { "operation": { "const": "deleteSpan" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/deleteData" } } } },
+        { "if": { "properties": { "operation": { "const": "queryPlanLine" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/planLineData" } } } }
       ]
     },
     "errorResponse": {
@@ -155,7 +143,7 @@
       "additionalProperties": false,
       "properties": {
         "contractVersion": { "$ref": "#/$defs/version" },
-        "operation": { "enum": ["initialize", "createBenefit", "updateBenefit", "deleteBenefit", "queryBenefit", "queryEmployee"] },
+        "operation": { "enum": ["initialize", "createSpan", "updateSpan", "deleteSpan", "querySpan", "queryPlanLine"] },
         "requestId": { "$ref": "#/$defs/requestId" },
         "ok": { "const": false },
         "error": {
@@ -163,7 +151,7 @@
           "required": ["code", "message"],
           "additionalProperties": false,
           "properties": {
-            "code": { "enum": ["MALFORMED_REQUEST", "INVALID_DIMENSION_DEFINITION", "UNKNOWN_DIMENSION", "UNKNOWN_DIMENSION_VALUE", "INVALID_FORMULA", "DUPLICATE_SPAN", "NOT_FOUND", "INVALID_STATE", "INDEX_FAILURE"] },
+            "code": { "enum": ["MALFORMED_REQUEST", "INVALID_DIMENSION_DEFINITION", "UNKNOWN_DIMENSION", "UNKNOWN_DIMENSION_VALUE", "DUPLICATE_SPAN", "NOT_FOUND", "INVALID_STATE", "INDEX_FAILURE"] },
             "message": { "type": "string", "minLength": 1 },
             "details": { "type": "object", "additionalProperties": true }
           }

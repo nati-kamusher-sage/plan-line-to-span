@@ -29,7 +29,7 @@ interface Measurement {
 /**
  * Counts every box comparison RTree.searchCounting performs for a
  * point query, using the real geometry conversion (`model.planLineToPoint`)
- * a real `BenefitStore.match` would use.
+ * a real `SpanStore.match` would use.
  */
 function measureIndexedQuery(
   tree: RTree<number>, model: DimensionModel, planLine: Readonly<Record<string, string>>,
@@ -67,7 +67,7 @@ function measureNaiveScan(
 
 interface VolumeResult {
   readonly volume: string;
-  readonly operation: 'queryBenefit (findExact)' | 'queryEmployee (searchMatching)';
+  readonly operation: 'querySpan (findExact)' | 'queryPlanLine (searchMatching)';
   readonly comparisonsAtN: number;
   readonly comparisonsAt8N: number;
   readonly growthRatio: number;
@@ -84,18 +84,18 @@ function buildIndexedTree(built: BuiltVolume): RTree<number> {
 }
 
 function runVolume(volume: Volume): VolumeResult[] {
-  const maxBenefits = volume.benefits * 8;
-  const atN = buildVolume(SEED, volume, volume.benefits, maxBenefits);
-  const at8N = buildVolume(SEED, volume, maxBenefits, maxBenefits);
+  const maxSpans = volume.spans * 8;
+  const atN = buildVolume(SEED, volume, volume.spans, maxSpans);
+  const at8N = buildVolume(SEED, volume, maxSpans, maxSpans);
 
   const treeAtN = buildIndexedTree(atN);
   const treeAt8N = buildIndexedTree(at8N);
 
-  // queryEmployee: point search via planLineToPoint, matching >=1 span by hierarchy.
-  const employeeAtN = measureIndexedQuery(treeAtN, atN.model, atN.singleMatchPlanLine);
-  const employeeAt8N = measureIndexedQuery(treeAt8N, at8N.model, at8N.singleMatchPlanLine);
+  // queryPlanLine: point search via planLineToPoint, matching >=1 span by hierarchy.
+  const planLineAtN = measureIndexedQuery(treeAtN, atN.model, atN.singleMatchPlanLine);
+  const planLineAt8N = measureIndexedQuery(treeAt8N, at8N.model, at8N.singleMatchPlanLine);
 
-  // queryBenefit (exact lookup): same point search machinery, since
+  // querySpan (exact lookup): same point search machinery, since
   // findExact narrows via tree.search before filtering by CanonicalSpan
   // equality (index-adapter.ts) -- the box traversal is identical to a
   // plan-line query for a span with no omitted dimensions.
@@ -118,16 +118,16 @@ function runVolume(volume: Volume): VolumeResult[] {
   };
 
   return [
-    toResult('queryEmployee (searchMatching)', employeeAtN, employeeAt8N),
-    toResult('queryBenefit (findExact)', exactAtN, exactAt8N),
+    toResult('queryPlanLine (searchMatching)', planLineAtN, planLineAt8N),
+    toResult('querySpan (findExact)', exactAtN, exactAt8N),
   ];
 }
 
 function runNaiveControl(): VolumeResult {
   const volume = VOLUMES[1]!; // V2 nominal, the headline figure.
-  const maxBenefits = volume.benefits * 8;
-  const atN = buildVolume(SEED, volume, volume.benefits, maxBenefits);
-  const at8N = buildVolume(SEED, volume, maxBenefits, maxBenefits);
+  const maxSpans = volume.spans * 8;
+  const atN = buildVolume(SEED, volume, volume.spans, maxSpans);
+  const at8N = buildVolume(SEED, volume, maxSpans, maxSpans);
 
   const entriesOf = (built: BuiltVolume) => built.spans.map(span => {
     const canonical = resolveSpan(span, built.model);
@@ -145,7 +145,7 @@ function runNaiveControl(): VolumeResult {
   }
   const growthRatio = eightN.comparisons / n.comparisons;
   return {
-    volume: `${volume.name} (naive-scan control)`, operation: 'queryEmployee (searchMatching)',
+    volume: `${volume.name} (naive-scan control)`, operation: 'queryPlanLine (searchMatching)',
     comparisonsAtN: n.comparisons, comparisonsAt8N: eightN.comparisons,
     growthRatio, pass: growthRatio < PASS_THRESHOLD,
   };

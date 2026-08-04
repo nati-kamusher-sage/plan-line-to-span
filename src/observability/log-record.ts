@@ -5,7 +5,7 @@
  * impossible by construction, not merely avoided by review. This builder
  * accepts only primitives from bounded sets: every field is a non-negative
  * integer, a number, or a member of an enumerated set. There is no field of
- * unbounded string content, so a span, formula, dimension value, request ID,
+ * unbounded string content, so a span, plan-line value, request ID,
  * or raw error message has nowhere to go -- passing one is a type error, not
  * a leak (DEC-53).
  *
@@ -17,20 +17,20 @@
 const EVENT = 'plan_line_to_span.operation_completed';
 
 const OPERATIONS = new Set([
-  'initialize', 'createBenefit', 'updateBenefit', 'deleteBenefit', 'queryBenefit', 'queryEmployee',
+  'initialize', 'createSpan', 'updateSpan', 'deleteSpan', 'querySpan', 'queryPlanLine',
 ]);
 const OUTCOMES = new Set(['success', 'failure']);
 const ERROR_CODES = new Set([
   'MALFORMED_REQUEST', 'INVALID_DIMENSION_DEFINITION', 'UNKNOWN_DIMENSION',
-  'UNKNOWN_DIMENSION_VALUE', 'INVALID_FORMULA', 'DUPLICATE_SPAN', 'NOT_FOUND',
+  'UNKNOWN_DIMENSION_VALUE', 'DUPLICATE_SPAN', 'NOT_FOUND',
   'INVALID_STATE', 'INDEX_FAILURE',
 ]);
 const STATES = new Set(['uninitialized', 'initializing', 'ready', 'failed']);
 
-export type LogOperation = 'initialize' | 'createBenefit' | 'updateBenefit' | 'deleteBenefit' | 'queryBenefit' | 'queryEmployee';
+export type LogOperation = 'initialize' | 'createSpan' | 'updateSpan' | 'deleteSpan' | 'querySpan' | 'queryPlanLine';
 export type LogOutcome = 'success' | 'failure';
 export type LogErrorCode = 'MALFORMED_REQUEST' | 'INVALID_DIMENSION_DEFINITION' | 'UNKNOWN_DIMENSION'
-  | 'UNKNOWN_DIMENSION_VALUE' | 'INVALID_FORMULA' | 'DUPLICATE_SPAN' | 'NOT_FOUND' | 'INVALID_STATE' | 'INDEX_FAILURE';
+  | 'UNKNOWN_DIMENSION_VALUE' | 'DUPLICATE_SPAN' | 'NOT_FOUND' | 'INVALID_STATE' | 'INDEX_FAILURE';
 export type LogState = 'uninitialized' | 'initializing' | 'ready' | 'failed';
 export type LogLevel = 'info' | 'warn' | 'error';
 
@@ -40,7 +40,7 @@ export interface LogRecordInput {
   readonly outcome: LogOutcome;
   readonly durationMs: number;
   readonly state: LogState;
-  readonly benefitCount: number;
+  readonly spanCount: number;
   readonly errorCode?: LogErrorCode;
   readonly matchCount?: number;
   readonly dimensionCount?: number;
@@ -56,7 +56,7 @@ export interface LogRecord {
   readonly outcome: LogOutcome;
   readonly durationMs: number;
   readonly state: LogState;
-  readonly benefitCount: number;
+  readonly spanCount: number;
   readonly errorCode?: LogErrorCode;
   readonly matchCount?: number;
   readonly dimensionCount?: number;
@@ -93,7 +93,7 @@ function deriveLevel(outcome: LogOutcome, errorCode: LogErrorCode | undefined): 
  */
 export function buildLogRecord(input: LogRecordInput): LogRecord {
   const {
-    sequence, operation, outcome, durationMs, state, benefitCount,
+    sequence, operation, outcome, durationMs, state, spanCount,
     errorCode, matchCount, dimensionCount, dimensionValueCount,
   } = input;
 
@@ -104,7 +104,7 @@ export function buildLogRecord(input: LogRecordInput): LogRecord {
   const record: {
     timestamp: string; event: 'plan_line_to_span.operation_completed'; sequence: number;
     level: LogLevel; operation: LogOperation; outcome: LogOutcome; durationMs: number;
-    state: LogState; benefitCount: number;
+    state: LogState; spanCount: number;
     errorCode?: LogErrorCode; matchCount?: number; dimensionCount?: number; dimensionValueCount?: number;
   } = {
     timestamp: new Date().toISOString(),
@@ -115,7 +115,7 @@ export function buildLogRecord(input: LogRecordInput): LogRecord {
     outcome: requireMember(outcome, OUTCOMES, 'outcome'),
     durationMs,
     state: requireMember(state, STATES, 'state'),
-    benefitCount: requireNonNegativeInteger(benefitCount, 'benefitCount'),
+    spanCount: requireNonNegativeInteger(spanCount, 'spanCount'),
   };
 
   // Optional fields, each from a bounded domain. Omitted, never null (Obs 3).

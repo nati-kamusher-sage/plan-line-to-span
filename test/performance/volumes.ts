@@ -1,6 +1,6 @@
 /**
  * The four DT-7 evaluation volumes (section 5), and the deterministic
- * generator that builds each one's dimension file and benefit set.
+ * generator that builds each one's dimension file and span set.
  *
  * These are demo evaluation volumes: they exist to exercise the index along
  * two axes that stress an n-dimensional R*-tree differently -- dimension
@@ -10,7 +10,7 @@
  *
  * A shared seeded PRNG (the same linear-congruential generator
  * test/property/matching-vs-naive-scan.test.ts uses for DEC-13's
- * differential test) makes every volume's benefit set reproducible from its
+ * differential test) makes every volume's span set reproducible from its
  * seed (DEC-65), independent of this generator's own random dimension
  * shapes -- unlike the differential test, a volume's dimension count, depth,
  * and values-per-dimension are fixed parameters, not randomized per trial,
@@ -32,24 +32,24 @@ export interface Volume {
   readonly dimensions: number;
   readonly valuesPerDimension: number;
   readonly hierarchyDepth: number;
-  /** DT-7's "N": the baseline benefit count the pass condition compares against 8N of. */
-  readonly benefits: number;
+  /** DT-7's "N": the baseline span count the pass condition compares against 8N of. */
+  readonly spans: number;
 }
 
 /**
- * DT-7 section 5's table states V1 as 10 benefits, but 1 dimension with 5
+ * DT-7 section 5's table states V1 as 10 spans, but 1 dimension with 5
  * values total (split across 2 hierarchy levels) supports at most 5 distinct
- * non-empty single-value spans -- `BenefitStore` forbids duplicate canonical
+ * non-empty single-value spans -- `SpanStore` forbids duplicate canonical
  * spans (OC 6.6). This is an inconsistency in DT-7's own volume table; it
  * does not block the harness (see the synthetic uniqueness dimension below,
  * which does not depend on the stated dimension's own value count), so V1's
- * benefit count is kept exactly as stated rather than silently altered.
+ * span count is kept exactly as stated rather than silently altered.
  */
 export const VOLUMES: readonly Volume[] = [
-  { name: 'V1 minimal', dimensions: 1, valuesPerDimension: 5, hierarchyDepth: 2, benefits: 10 },
-  { name: 'V2 nominal', dimensions: 3, valuesPerDimension: 50, hierarchyDepth: 3, benefits: 500 },
-  { name: 'V3 wide', dimensions: 8, valuesPerDimension: 20, hierarchyDepth: 2, benefits: 1000 },
-  { name: 'V4 deep', dimensions: 2, valuesPerDimension: 200, hierarchyDepth: 6, benefits: 2000 },
+  { name: 'V1 minimal', dimensions: 1, valuesPerDimension: 5, hierarchyDepth: 2, spans: 10 },
+  { name: 'V2 nominal', dimensions: 3, valuesPerDimension: 50, hierarchyDepth: 3, spans: 500 },
+  { name: 'V3 wide', dimensions: 8, valuesPerDimension: 20, hierarchyDepth: 2, spans: 1000 },
+  { name: 'V4 deep', dimensions: 2, valuesPerDimension: 200, hierarchyDepth: 6, spans: 2000 },
 ];
 
 /**
@@ -99,22 +99,22 @@ const SEQ_DIMENSION_ID = 'seq';
  * guarantee span uniqueness, not to stress dimensionality or depth.
  *
  * DEC-48's pass condition needs comparisons measured at both N and 8N
- * benefits for the same volume shape. Two volumes make guaranteeing
+ * spans for the same volume shape. Two volumes make guaranteeing
  * uniqueness through only the *stated* dimensions impossible at 8N: V1 (1
  * dimension, 5 values) has only 5 possible non-empty single-value spans
  * total, far short of 8N=80; V4's leaf level (2 dimensions, ~33 values each
  * after a 6-level split) offers ~1,089 combinations, short of 8N=16,000.
- * Adding one synthetic dimension sized to `maxBenefits` sidesteps this
+ * Adding one synthetic dimension sized to `maxSpans` sidesteps this
  * entirely: every span's `seq` value alone is already unique, so the stated
  * dimensions are free to repeat across spans however they like, which
  * keeps this volume's actual index shape (its real axis count and depth)
- * exactly as DT-7 specifies rather than distorted to reach a benefit count.
+ * exactly as DT-7 specifies rather than distorted to reach a span count.
  */
-function buildSeqDimension(maxBenefits: number): DimensionDefinition {
+function buildSeqDimension(maxSpans: number): DimensionDefinition {
   return {
     id: SEQ_DIMENSION_ID,
     name: SEQ_DIMENSION_ID,
-    values: Array.from({ length: maxBenefits }, (_, i) => ({ key: `seq-${i}`, name: `seq-${i}` })),
+    values: Array.from({ length: maxSpans }, (_, i) => ({ key: `seq-${i}`, name: `seq-${i}` })),
   };
 }
 
@@ -128,9 +128,9 @@ export interface BuiltVolume {
 
 /**
  * Builds one volume's model (the volume's stated dimensions plus the
- * synthetic `seq` uniqueness dimension) and `benefitCount` distinct spans.
+ * synthetic `seq` uniqueness dimension) and `spanCount` distinct spans.
  *
- * `maxBenefits` sizes the `seq` dimension once, so the *model* built for
+ * `maxSpans` sizes the `seq` dimension once, so the *model* built for
  * measuring at N and the model built for measuring at 8N are identical in
  * shape (same dimension count, same value counts) -- only the number of
  * spans inserted differs. This matters because DEC-48 compares comparison
@@ -147,9 +147,9 @@ export interface BuiltVolume {
  * every dimension the span names, including `seq`, whose values have no
  * hierarchy at all, so ancestor-or-self degenerates to equality).
  */
-export function buildVolume(seed: number, volume: Volume, benefitCount: number, maxBenefits: number): BuiltVolume {
-  if (benefitCount > maxBenefits) {
-    throw new Error(`benefitCount (${benefitCount}) exceeds maxBenefits (${maxBenefits})`);
+export function buildVolume(seed: number, volume: Volume, spanCount: number, maxSpans: number): BuiltVolume {
+  if (spanCount > maxSpans) {
+    throw new Error(`spanCount (${spanCount}) exceeds maxSpans (${maxSpans})`);
   }
 
   const rnd = makeRandom(seed);
@@ -160,11 +160,11 @@ export function buildVolume(seed: number, volume: Volume, benefitCount: number, 
 
   const file: DimensionFile = {
     format: DIMENSION_FILE_FORMAT,
-    dimensions: [...statedDefinitions, buildSeqDimension(maxBenefits)],
+    dimensions: [...statedDefinitions, buildSeqDimension(maxSpans)],
   };
   const model = buildDimensionModel(file);
 
-  const spans: Record<string, string>[] = Array.from({ length: benefitCount }, (_, i) => {
+  const spans: Record<string, string>[] = Array.from({ length: spanCount }, (_, i) => {
     const span: Record<string, string> = { [SEQ_DIMENSION_ID]: `seq-${i}` };
     for (let d = 0; d < dimensionIds.length; d++) {
       const leafValues = leafValuesByDimension[d]!;

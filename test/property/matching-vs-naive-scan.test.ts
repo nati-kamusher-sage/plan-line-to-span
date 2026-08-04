@@ -1,12 +1,12 @@
 /**
- * DEC-13: the R*-tree-backed BenefitStore against a naive linear-scan
+ * DEC-13: the R*-tree-backed SpanStore against a naive linear-scan
  * matcher, over randomly generated models, spans, and plan lines.
  *
  * T2's differential test (dimension-model-vs-ancestor-walk.test.ts) checks
  * that DimensionModel's containment geometry agrees with a parent-walk
  * oracle for a single span/plan-line pair. This test is one layer up: it
- * builds a real BenefitStore with many stored benefits and confirms that
- * BenefitStore.match agrees with an oracle that re-derives OC 9.2's matching
+ * builds a real SpanStore with many stored spans and confirms that
+ * SpanStore.match agrees with an oracle that re-derives OC 9.2's matching
  * rule directly from the dimension hierarchy, with no geometry involved at
  * all. Agreement here is what the design plan's DT-7 harness will later use
  * as its control — a scan is expected to agree always and prune never.
@@ -18,10 +18,10 @@ import {
   buildDimensionModel, DIMENSION_FILE_FORMAT,
   type DimensionDefinition, type DimensionFile,
 } from '../../src/model/dimension-model.ts';
-import { resolveSpan } from '../../src/model/span.ts';
+import { resolveSpan, type CanonicalSpan } from '../../src/model/span.ts';
 import { RTree } from '../../src/index/rtree.ts';
-import { IndexAdapter, type IndexedBenefit } from '../../src/store/index-adapter.ts';
-import { BenefitStore } from '../../src/store/benefit-store.ts';
+import { IndexAdapter } from '../../src/store/index-adapter.ts';
+import { SpanStore } from '../../src/store/span-store.ts';
 
 function makeRandom(seed: number): () => number {
   let s = seed;
@@ -74,7 +74,7 @@ function naiveApplies(
   return true;
 }
 
-test('BenefitStore.match agrees with a naive scan-and-check oracle', () => {
+test('SpanStore.match agrees with a naive scan-and-check oracle', () => {
   const rnd = makeRandom(20260803);
   const randInt = (n: number): number => Math.floor(rnd() * n);
   let queriesChecked = 0;
@@ -91,26 +91,20 @@ test('BenefitStore.match agrees with a naive scan-and-check oracle', () => {
       dimensions: generated.map(g => g.definition),
     };
     const model = buildDimensionModel(file);
-    const index = new IndexAdapter(new RTree<IndexedBenefit>(model.axisCount), model);
-    const store = new BenefitStore(index);
+    const index = new IndexAdapter(new RTree<CanonicalSpan>(model.axisCount), model);
+    const store = new SpanStore(index);
 
-    // Keyed by formula, not by array position: a random model can regenerate
-    // the same canonical span twice, and BenefitStore correctly rejects the
-    // second (that rejection is its own job, not this test's subject). Array
-    // position drifts from the formula counter the moment any insertion is
-    // skipped, which silently corrupted this test's oracle on its first
-    // version — the "mismatch" it reported was the test comparing the wrong
-    // span to the wrong formula, not a defect in BenefitStore or RTree.
-    const storedSpans = new Map<number, Record<string, string>>();
-    const benefitCount = 5 + randInt(20);
-    for (let i = 0; i < benefitCount; i++) {
+    const storedSpans = new Map<string, Record<string, string>>();
+    const spanCount = 5 + randInt(20);
+    for (let i = 0; i < spanCount; i++) {
       const span: Record<string, string> = {};
       for (const g of generated) {
         if (rnd() < 0.5) span[g.definition.id] = g.values[randInt(g.values.length)]!.key;
       }
       try {
-        store.create(resolveSpan(span, model), i);
-        storedSpans.set(i, span);
+        const canonical = resolveSpan(span, model);
+        store.create(canonical);
+        storedSpans.set(canonical.key, span);
       } catch {
         // duplicate canonical span; skip
       }
@@ -122,11 +116,11 @@ test('BenefitStore.match agrees with a naive scan-and-check oracle', () => {
         if (rnd() < 0.8) planLine[g.definition.id] = g.values[randInt(g.values.length)]!.key;
       }
 
-      const fromStore = store.match(planLine).map(b => b.formula as number).sort((a, b) => a - b);
+      const fromStore = store.match(planLine).map(span => span.key).sort();
       const fromOracle = [...storedSpans.entries()]
         .filter(([, span]) => naiveApplies(generated, span, planLine))
-        .map(([formula]) => formula)
-        .sort((a, b) => a - b);
+        .map(([key]) => key)
+        .sort();
 
       queriesChecked++;
       assert.deepEqual(fromStore, fromOracle,

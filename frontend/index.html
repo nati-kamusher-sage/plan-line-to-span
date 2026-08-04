@@ -14,34 +14,34 @@
   <main>
     <section class="panel">
       <h2>1. Initialize</h2>
-      <p>Loads a dimension model. Replaces any existing model and clears stored benefits.</p>
+      <p>Loads a dimension model. Replaces any existing model and clears stored spans.</p>
       <label for="init-payload">Dimension file (JSON)</label>
       <textarea id="init-payload" rows="10"></textarea>
       <button id="init-submit">Send initialize</button>
     </section>
 
     <section class="panel">
-      <h2>2. Create / update / delete / query a benefit</h2>
-      <label for="benefit-operation">Operation</label>
-      <select id="benefit-operation">
-        <option value="createBenefit">createBenefit</option>
-        <option value="updateBenefit">updateBenefit</option>
-        <option value="deleteBenefit">deleteBenefit</option>
-        <option value="queryBenefit">queryBenefit</option>
+      <h2>2. Create / update / delete / query a span</h2>
+      <label for="span-operation">Operation</label>
+      <select id="span-operation">
+        <option value="createSpan">createSpan</option>
+        <option value="updateSpan">updateSpan</option>
+        <option value="deleteSpan">deleteSpan</option>
+        <option value="querySpan">querySpan</option>
       </select>
-      <label for="benefit-span">Span (JSON object of dimensionId: valueKey)</label>
-      <textarea id="benefit-span" rows="3">{"location": "4"}</textarea>
-      <label for="benefit-formula">Formula (JSON object — ignored for delete/query)</label>
-      <textarea id="benefit-formula" rows="3">{"rate": 0.1}</textarea>
-      <button id="benefit-submit">Send</button>
+      <label for="span-span">Span (JSON object of dimensionId: valueKey)</label>
+      <textarea id="span-span" rows="3">{"location": "4"}</textarea>
+      <label for="replacement-span">Replacement span (JSON object — used by update only)</label>
+      <textarea id="replacement-span" rows="3">{"location": "20"}</textarea>
+      <button id="span-submit">Send</button>
     </section>
 
     <section class="panel">
-      <h2>3. Query employee</h2>
-      <p>Returns every benefit whose span applies to the given plan line.</p>
-      <label for="employee-dimensions">Plan line (JSON object of dimensionId: valueKey)</label>
-      <textarea id="employee-dimensions" rows="3">{"location": "20"}</textarea>
-      <button id="employee-submit">Send queryEmployee</button>
+      <h2>3. Query a plan line</h2>
+      <p>Returns every span that applies to the given plan line.</p>
+      <label for="plan-line-dimensions">Plan line (JSON object of dimensionId: valueKey)</label>
+      <textarea id="plan-line-dimensions" rows="3">{"location": "20"}</textarea>
+      <button id="plan-line-submit">Send queryPlanLine</button>
     </section>
 
     <section class="panel">

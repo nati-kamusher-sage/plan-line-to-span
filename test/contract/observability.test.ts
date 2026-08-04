@@ -22,7 +22,7 @@ function capturingEmitter(): { emitter: ObservabilityEmitter; records: () => Rec
   return { emitter, records: () => lines.map(l => JSON.parse(l) as Record<string, unknown>) };
 }
 
-const COMMON_FIELDS = ['timestamp', 'event', 'sequence', 'level', 'operation', 'outcome', 'durationMs', 'state', 'benefitCount'];
+const COMMON_FIELDS = ['timestamp', 'event', 'sequence', 'level', 'operation', 'outcome', 'durationMs', 'state', 'spanCount'];
 
 function assertCommonFields(record: Record<string, unknown>): void {
   for (const field of COMMON_FIELDS) assert.ok(field in record, `missing common field ${field}`);
@@ -30,17 +30,17 @@ function assertCommonFields(record: Record<string, unknown>): void {
   assert.ok((record['durationMs'] as number) >= 0, 'durationMs must be non-negative');
 }
 
-test('AC-OBS-01: a successful create, employee query with one match, and delete each produce a valid record', () => {
+test('AC-OBS-01: a successful create, planLine query with one match, and delete each produce a valid record', () => {
   const { emitter, records } = capturingEmitter();
   emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'createBenefit', payload: { span: { location: '4' }, formula: { r: 1 } },
+    contractVersion: V, operation: 'createSpan', payload: { span: { location: '4' } },
   }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'queryEmployee', payload: { dimensions: { location: '20' } },
+    contractVersion: V, operation: 'queryPlanLine', payload: { dimensions: { location: '20' } },
   }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'deleteBenefit', payload: { span: { location: '4' } },
+    contractVersion: V, operation: 'deleteSpan', payload: { span: { location: '4' } },
   }));
 
   const recs = records();
@@ -48,27 +48,27 @@ test('AC-OBS-01: a successful create, employee query with one match, and delete 
   for (const r of recs) assertCommonFields(r);
 
   const [, createRec, queryRec, deleteRec] = recs;
-  assert.equal(createRec!['operation'], 'createBenefit');
+  assert.equal(createRec!['operation'], 'createSpan');
   assert.equal(createRec!['outcome'], 'success');
-  assert.equal(queryRec!['operation'], 'queryEmployee');
+  assert.equal(queryRec!['operation'], 'queryPlanLine');
   assert.equal(queryRec!['outcome'], 'success');
   assert.equal(queryRec!['matchCount'], 1);
-  assert.equal(deleteRec!['operation'], 'deleteBenefit');
+  assert.equal(deleteRec!['operation'], 'deleteSpan');
   assert.equal(deleteRec!['outcome'], 'success');
 });
 
-test('AC-OBS-02: an unknown-dimension create and an absent delete each produce a warn record with an unchanged benefitCount', () => {
+test('AC-OBS-02: an unknown-dimension create and an absent delete each produce a warn record with an unchanged spanCount', () => {
   const { emitter, records } = capturingEmitter();
   emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'createBenefit', payload: { span: { location: '4' }, formula: { r: 1 } },
+    contractVersion: V, operation: 'createSpan', payload: { span: { location: '4' } },
   }));
 
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'createBenefit', payload: { span: { unknown: 'x' }, formula: {} },
+    contractVersion: V, operation: 'createSpan', payload: { span: { unknown: 'x' } },
   }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'deleteBenefit', payload: { span: { location: '21' } },
+    contractVersion: V, operation: 'deleteSpan', payload: { span: { location: '21' } },
   }));
 
   const recs = records();
@@ -77,23 +77,23 @@ test('AC-OBS-02: an unknown-dimension create and an absent delete each produce a
   assert.equal(unknownDimRec!['level'], 'warn');
   assert.equal(unknownDimRec!['outcome'], 'failure');
   assert.equal(unknownDimRec!['errorCode'], 'UNKNOWN_DIMENSION');
-  assert.equal(unknownDimRec!['benefitCount'], 1);
+  assert.equal(unknownDimRec!['spanCount'], 1);
   assert.ok(!('matchCount' in unknownDimRec!));
 
   assert.equal(absentDeleteRec!['level'], 'warn');
   assert.equal(absentDeleteRec!['outcome'], 'failure');
   assert.equal(absentDeleteRec!['errorCode'], 'NOT_FOUND');
-  assert.equal(absentDeleteRec!['benefitCount'], 1);
+  assert.equal(absentDeleteRec!['spanCount'], 1);
 });
 
-test('AC-OBS-03: delete then reinitialize each report benefitCount 0; the initialize record carries dimension counts', () => {
+test('AC-OBS-03: delete then reinitialize each report spanCount 0; the initialize record carries dimension counts', () => {
   const { emitter, records } = capturingEmitter();
   emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'createBenefit', payload: { span: { location: '4' }, formula: { r: 1 } },
+    contractVersion: V, operation: 'createSpan', payload: { span: { location: '4' } },
   }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'deleteBenefit', payload: { span: { location: '4' } },
+    contractVersion: V, operation: 'deleteSpan', payload: { span: { location: '4' } },
   }));
   emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE }));
 
@@ -101,10 +101,10 @@ test('AC-OBS-03: delete then reinitialize each report benefitCount 0; the initia
   const [initRec, , deleteRec, reinitRec] = recs;
 
   assert.equal(deleteRec!['outcome'], 'success');
-  assert.equal(deleteRec!['benefitCount'], 0);
+  assert.equal(deleteRec!['spanCount'], 0);
 
   assert.equal(reinitRec!['outcome'], 'success');
-  assert.equal(reinitRec!['benefitCount'], 0);
+  assert.equal(reinitRec!['spanCount'], 0);
   // D1 has 2 dimensions (location, department) and 7 values total:
   // location {4, 20, 21, 22, 30} = 5, department {rnd, eng} = 2.
   assert.equal(reinitRec!['dimensionCount'], 2);
@@ -113,30 +113,30 @@ test('AC-OBS-03: delete then reinitialize each report benefitCount 0; the initia
   assert.equal(initRec!['dimensionValueCount'], 7);
 });
 
-test('AC-OBS-04: sentinel formulas and plan-line values never appear in any captured record', () => {
+test('AC-OBS-04: span, plan-line, and request identifiers never appear in captured records', () => {
   const { emitter, records } = capturingEmitter();
-  const SENTINEL_FORMULA = 'sekrit-formula-9f2b1c';
+  const SENTINEL_SPAN = 'sekrit-span-9f2b1c';
   const SENTINEL_VALUE = 'sekrit-value-4d8e2a';
 
   emitter.dispatch(JSON.stringify({ contractVersion: V, operation: 'initialize', payload: D1_FILE }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'createBenefit',
-    payload: { span: { location: '4' }, formula: { note: SENTINEL_FORMULA } },
+    contractVersion: V, operation: 'createSpan',
+    payload: { span: { location: SENTINEL_SPAN } },
   }));
   emitter.dispatch(JSON.stringify({
-    contractVersion: V, operation: 'queryEmployee', payload: { dimensions: { location: '20' } },
+    contractVersion: V, operation: 'queryPlanLine', payload: { dimensions: { location: '20' } },
     requestId: SENTINEL_VALUE,
   }));
 
   const recs = records();
   for (const rec of recs) {
     const line = JSON.stringify(rec);
-    assert.ok(!line.includes(SENTINEL_FORMULA), `formula sentinel leaked into a record: ${line}`);
+    assert.ok(!line.includes(SENTINEL_SPAN), `span sentinel leaked into a record: ${line}`);
     assert.ok(!line.includes(SENTINEL_VALUE), `requestId sentinel leaked into a record: ${line}`);
     // Field *names*, not a bare substring search: the event name
     // "plan_line_to_span.operation_completed" legitimately contains "span".
     assert.ok(!('span' in rec), `a span field leaked into a record: ${line}`);
-    assert.ok(!('formula' in rec), `a formula field leaked into a record: ${line}`);
+    assert.ok(!('planLine' in rec), `a plan-line field leaked into a record: ${line}`);
     assert.ok(!('requestId' in rec), `a requestId field leaked into a record: ${line}`);
   }
 });
