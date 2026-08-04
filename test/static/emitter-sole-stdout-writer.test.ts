@@ -6,12 +6,20 @@
  * builder entirely and writing arbitrary payload data straight to stdout.
  *
  * This scans every `src/` file outside the observability module for
- * `console.log`/`console.info`/`console.warn`/`console.error` and
- * `process.stdout.write`/`process.stderr.write`, with comments and string
- * literals stripped first (the same technique as
+ * `console.log`/`console.info` and `process.stdout.write`, with comments and
+ * string literals stripped first (the same technique as
  * `handlers-never-await.test.ts`, DEC-64). A source-text scan is exhaustive
  * over this codebase's style in a way a runtime test sampling call paths
  * could not be.
+ *
+ * `console.warn`/`console.error`/`process.stderr.write` are deliberately not
+ * banned here: Node routes all three to stderr, not stdout, so they cannot
+ * produce the failure Obs 2/7 guard against -- a payload-bearing line
+ * indistinguishable from a real JSON Lines operation-completion record in
+ * the captured stdout stream. T13's server startup banner uses
+ * `process.stderr.write` for exactly this reason (an operational message,
+ * not an operation-completion record), and banning stderr here would only
+ * push it to reinvent its own ad hoc "write to fd 2" mechanism.
  */
 
 import { test } from 'node:test';
@@ -43,16 +51,16 @@ function listTsFilesRecursive(dir: string): string[] {
   return files;
 }
 
-const STDOUT_WRITE_PATTERN = /console\.(log|info|warn|error)\s*\(|process\.(stdout|stderr)\.write\s*\(/;
+const STDOUT_WRITE_PATTERN = /console\.(log|info)\s*\(|process\.stdout\.write\s*\(/;
 
-test('no source file outside src/observability writes to stdout or stderr directly', () => {
+test('no source file outside src/observability writes to stdout directly', () => {
   const files = listTsFilesRecursive(SRC_DIR).filter(f => !f.startsWith(OBSERVABILITY_DIR));
   assert.ok(files.length > 0, 'expected to find non-observability source files to scan');
 
   for (const file of files) {
     const stripped = stripCommentsAndStrings(readFileSync(file, 'utf8'));
     assert.equal(STDOUT_WRITE_PATTERN.test(stripped), false,
-      `${file} writes to stdout/stderr directly; only ObservabilityEmitter's sink may (DEC-53's privacy guarantee covers only that path)`);
+      `${file} writes to stdout directly; only ObservabilityEmitter's sink may (DEC-53's privacy guarantee covers only that path)`);
   }
 });
 

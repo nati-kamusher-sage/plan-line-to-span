@@ -240,10 +240,14 @@ Wire the comparison counter and run the DT-7 volumes (DEC-45 to DEC-51).
 
 ### T13 — frontend
 
+**Status: Complete.** Merged as [#15](https://github.com/nati-kamusher-sage/plan-line-to-span/pull/15); see [t13-frontend.md](pull-requests/t13-frontend.md).
+
 A thin UI over the contract surface, added only after the backend passes all 48 cases (DEC-2).
 
 **Resolves open items:** frontend framework selection.
 **Cases:** none. The UI must add no behavior the contract does not define.
+
+**Outcome:** 196 tests pass. DEC-2's own stated gate (all 48 cases) was not met — 43/48, T8 remains skipped — and T13 proceeded anyway by explicit instruction, recorded rather than hidden. Framework selection resolved to Node's built-in `http` module and plain HTML/CSS/JS with no framework and no build step, per DT-1 R4's minimal-dependency preference. Built `HttpTransportAdapter` (DT-4's previously unimplemented `TransportAdapter`) and `src/server.ts`, the first point connecting `OperationDispatcher`, `ObservabilityEmitter`, and a real transport end to end outside a test. Manual verification was HTTP-driven rather than browser-driven, since no browser automation tooling was available in the environment and installing one would itself have violated the minimal-dependency principle — a stated limitation, not an implied pass. Corrected an over-broad T10 static check (`emitter-sole-stdout-writer`) that banned `console.warn`/`console.error`/`process.stderr.write` alongside the stdout-specific calls it actually needed to ban, discovered while giving `server.ts`'s startup banner a legitimate place to write.
 
 ## 5. Regression testing
 

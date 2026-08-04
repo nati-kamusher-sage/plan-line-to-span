@@ -9,7 +9,8 @@
     "test": "npm run typecheck && node --test \"test/**/*.test.ts\"",
     "test:only": "node --test \"test/**/*.test.ts\"",
     "prototypes": "for f in docs/design/prototypes/dt-*.mjs; do echo \"== $f\"; node \"$f\" || exit 1; done",
-    "performance": "node test/performance/growth-harness.ts"
+    "performance": "node test/performance/growth-harness.ts",
+    "start": "node src/server.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

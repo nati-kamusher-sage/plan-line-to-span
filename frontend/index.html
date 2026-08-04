@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Plan Line to Span — demo</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Plan Line to Span</h1>
+    <p class="subtitle">A thin client over the contract surface. Every button sends one request envelope and shows the response envelope exactly as returned — no interpretation happens here.</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>1. Initialize</h2>
+      <p>Loads a dimension model. Replaces any existing model and clears stored benefits.</p>
+      <label for="init-payload">Dimension file (JSON)</label>
+      <textarea id="init-payload" rows="10"></textarea>
+      <button id="init-submit">Send initialize</button>
+    </section>
+
+    <section class="panel">
+      <h2>2. Create / update / delete / query a benefit</h2>
+      <label for="benefit-operation">Operation</label>
+      <select id="benefit-operation">
+        <option value="createBenefit">createBenefit</option>
+        <option value="updateBenefit">updateBenefit</option>
+        <option value="deleteBenefit">deleteBenefit</option>
+        <option value="queryBenefit">queryBenefit</option>
+      </select>
+      <label for="benefit-span">Span (JSON object of dimensionId: valueKey)</label>
+      <textarea id="benefit-span" rows="3">{"location": "4"}</textarea>
+      <label for="benefit-formula">Formula (JSON object — ignored for delete/query)</label>
+      <textarea id="benefit-formula" rows="3">{"rate": 0.1}</textarea>
+      <button id="benefit-submit">Send</button>
+    </section>
+
+    <section class="panel">
+      <h2>3. Query employee</h2>
+      <p>Returns every benefit whose span applies to the given plan line.</p>
+      <label for="employee-dimensions">Plan line (JSON object of dimensionId: valueKey)</label>
+      <textarea id="employee-dimensions" rows="3">{"location": "20"}</textarea>
+      <button id="employee-submit">Send queryEmployee</button>
+    </section>
+
+    <section class="panel">
+      <h2>Response</h2>
+      <pre id="response-output">(no request sent yet)</pre>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
